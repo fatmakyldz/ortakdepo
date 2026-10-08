@@ -1,15 +1,21 @@
-{% from "_macros.html" import icon %}
 <!doctype html>
 <html lang="tr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#16233b">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" data-theme-color>
 <meta name="robots" content="noindex, nofollow">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="{{ app_name }}">
 <title>{% block title %}{{ app_name }}{% endblock %}</title>
-<link rel="preload" href="/static/fonts/bricolage-grotesque-latin-standard-normal.woff2" as="font" type="font/woff2" crossorigin>
+<script src="/static/js/theme.js?v={{ asset_v }}"></script>
+<link rel="preload" href="/static/fonts/archivo-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/css/app.css?v={{ asset_v }}">
-<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/brand/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png">
 </head>
 <body>
 {% block body %}
@@ -22,40 +28,57 @@
 ] %}
 {% set short = {"/sabit": "Sabit", "/ortaklar": "Ortaklar"} %}
 {% macro is_here(href) %}{% if (href == "/" and path == "/") or (href != "/" and path.startswith(href)) %}aria-current="page"{% endif %}{% endmacro %}
+{% macro theme_icons() %}<span class="on-light">{{ ikon("ay") }}</span><span class="on-dark">{{ ikon("gunes") }}</span>{% endmacro %}
 <div class="shell">
   {% if user %}
   <aside class="side">
-    <a class="brand" href="/">{{ app_name }}</a>
+    <a class="side-brand" href="/" aria-label="{{ app_name }}, ana sayfa">
+      <img class="on-light" src="/static/brand/sezkar-logo-acik-zemin.png" width="1248" height="267" alt="Sezkar">
+      <img class="on-dark" src="/static/brand/sezkar-logo-koyu-zemin.png" width="1248" height="267" alt="Sezkar">
+      <span>MUHASEBE</span>
+    </a>
     <nav aria-label="Ana menü">
       {% for href, label, ic in nav %}
-      <a href="{{ href }}" {{ is_here(href) }}>{{ icon(ic) }}{{ label }}{% if href == "/sabit" and alert_count %}<span class="nav-badge" title="Uyarı bekleyen ödeme">{{ alert_count }}</span>{% endif %}</a>
+      <a href="{{ href }}" {{ is_here(href) }}>{{ ikon(ic) }}{{ label }}{% if href == "/sabit" and alert_count %}<span class="nav-badge" title="Uyarı bekleyen ödeme">{{ alert_count }}</span>{% endif %}</a>
       {% endfor %}
-      <a href="/ayarlar" {{ is_here("/ayarlar") }}>{{ icon("ayarlar") }}Ayarlar</a>
+      <a href="/ayarlar" {{ is_here("/ayarlar") }}>{{ ikon("ayarlar") }}Ayarlar</a>
     </nav>
-    <div class="who">
-      <b>{{ user.name }}</b>
-      <form method="post" action="/cikis"><button type="submit">Çıkış yap</button></form>
+    <div class="side-foot">
+      <div class="who">
+        <span class="avatar" aria-hidden="true">{{ user.name[:1]|upper }}</span>
+        <span><b>{{ user.name }}</b><small>{{ user.email }}</small></span>
+      </div>
+      <button class="side-btn" type="button" data-theme-toggle>{{ theme_icons() }}<span class="on-light">Koyu tema</span><span class="on-dark">Açık tema</span></button>
+      <form method="post" action="/cikis"><button class="side-btn" type="submit">{{ ikon("cikis") }}Çıkış yap</button></form>
     </div>
   </aside>
   <header class="topbar">
-    <a class="brand" href="/">{{ app_name }}</a>
-    <a class="icon-link" href="/ayarlar" {{ is_here("/ayarlar") }} aria-label="Ayarlar">{{ icon("ayarlar") }}</a>
+    <a class="brand" href="/" aria-label="{{ app_name }}, ana sayfa">
+      <img class="on-light" src="/static/brand/sk-acik.png" width="370" height="159" alt="">
+      <img class="on-dark" src="/static/brand/sk-koyu.png" width="370" height="159" alt="">
+      <span class="brand-word">Muhasebe</span>
+    </a>
+    <div class="top-actions">
+      <button class="icon-btn" type="button" data-theme-toggle aria-label="Açık ya da koyu temaya geç">{{ theme_icons() }}</button>
+      <a class="icon-btn" href="/ayarlar" {{ is_here("/ayarlar") }} aria-label="Ayarlar">{{ ikon("ayarlar") }}</a>
+    </div>
   </header>
   {% endif %}
 
   <main class="main" id="icerik">
     {% if flashes %}
     <div class="flash" role="status">
-      {% for f in flashes %}<p class="{{ f.kind }}">{{ f.text }}</p>{% endfor %}
+      {% for f in flashes %}<p class="{{ f.kind }}">{{ ikon("tik" if f.kind == "ok" else "uyari") }}<span>{{ f.text }}</span></p>{% endfor %}
     </div>
     {% endif %}
     {% block content %}{% endblock %}
   </main>
 
   {% if user %}
+  {% if not hide_fab %}<a class="fab" href="/kayitlar/yeni?tur=gider" aria-label="Gider ya da gelir ekle">{{ ikon("arti") }}</a>{% endif %}
   <nav class="tabbar" aria-label="Ana menü">
     {% for href, label, ic in nav %}
-    <a href="{{ href }}" {{ is_here(href) }}>{{ icon(ic) }}{{ short.get(href, label) }}{% if href == "/sabit" and alert_count %}<span class="tab-badge">{{ alert_count }}</span>{% endif %}</a>
+    <a href="{{ href }}" {{ is_here(href) }}>{{ ikon(ic) }}{{ short.get(href, label) }}{% if href == "/sabit" and alert_count %}<span class="tab-badge">{{ alert_count }}</span>{% endif %}</a>
     {% endfor %}
   </nav>
   {% endif %}

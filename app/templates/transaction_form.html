@@ -1,16 +1,19 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon, who_chips %}
+{% from "_macros.html" import who_chips %}
 {% set editing = tx is not none %}
+{% set hide_fab = true %}
 {% block title %}{{ kind_label }} {{ "düzenle" if editing else "ekle" }} · {{ app_name }}{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <h1>{{ kind_label }} {{ "kaydını düzenle" if editing else "ekle" }}</h1>
-    {% if not editing %}
-    <p>{% if kind == "gider" %}Gelir mi girecektiniz? <a href="/kayitlar/yeni?tur=gelir">Gelir ekle</a>{% else %}Gider mi girecektiniz? <a href="/kayitlar/yeni?tur=gider">Gider ekle</a>{% endif %}</p>
-    {% endif %}
-  </div>
-</div>
+{% if editing %}
+<a class="back-link" href="/kayitlar/{{ tx.id }}">{{ ikon("sol") }}Kayda dön</a>
+<div class="page-head"><div><h1>{{ kind_label }} kaydını düzenle</h1></div></div>
+{% else %}
+<div class="page-head"><div><h1>Kayıt ekle</h1></div></div>
+<nav class="segmented" aria-label="Kayıt türü">
+  <a href="/kayitlar/yeni?tur=gider&gun={{ form.gun }}" {% if kind == "gider" %}aria-current="true"{% endif %}>{{ ikon("eksi") }}Gider</a>
+  <a href="/kayitlar/yeni?tur=gelir&gun={{ form.gun }}" {% if kind == "gelir" %}aria-current="true"{% endif %}>{{ ikon("arti") }}Gelir</a>
+</nav>
+{% endif %}
 
 {% if errors %}<ul class="errors" role="alert">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
 
@@ -31,7 +34,7 @@
     <legend>Kategori</legend>
     <div class="chips">
       {% for c in categories %}
-      <label class="chip"><input type="radio" name="kategori_id" value="{{ c.id }}" {{ "checked" if form.kategori_id == c.id|string }} required><span>{{ c.name }}</span></label>
+      <label class="chip"><input type="radio" name="kategori_id" value="{{ c.id }}" {{ "checked" if form.kategori_id == c.id|string }} required><span>{{ ikon(c.icon) }}{{ c.name }}</span></label>
       {% endfor %}
     </div>
     <span class="hint">Listede yoksa <a href="/ayarlar#kategoriler">Ayarlar'dan kategori ekleyin</a>.</span>
@@ -46,20 +49,20 @@
   <div class="field">
     <label for="gun">Tarih</label>
     <div class="date-row">
-      <input id="gun" type="date" name="gun" value="{{ form.gun }}" min="2000-01-01" max="{{ today.isoformat() }}" required>
+      <input id="gun" type="date" name="gun" value="{{ form.gun }}" min="{{ min_date.isoformat() }}" max="{{ today.isoformat() }}" required>
       <button class="btn btn-quiet btn-small" type="button" data-set-date="{{ today.isoformat() }}">Bugün</button>
       <button class="btn btn-quiet btn-small" type="button" data-set-date="{{ yesterday.isoformat() }}">Dün</button>
     </div>
   </div>
 
   <div class="field">
-    <label for="aciklama">Açıklama <span class="muted" style="font-weight:400">(isteğe bağlı)</span></label>
+    <label for="aciklama">Açıklama <span class="opt">(isteğe bağlı)</span></label>
     <input id="aciklama" type="text" name="aciklama" maxlength="300" value="{{ form.aciklama }}"
-           placeholder="{{ 'Örnek: 34 ABC 123, depo dolumu' if kind == 'gider' else 'Örnek: Yılmaz İnşaat, hafriyat' }}">
+           placeholder="{{ 'Örnek: 34 ABC 123, depo dolumu' if kind == 'gider' else 'Örnek: Yılmaz İnşaat, günlük kiralama' }}">
   </div>
 
   <div class="field">
-    <label for="fisler">{{ "Fiş ya da fatura" if kind == "gider" else "Dekont ya da makbuz" }} <span class="muted" style="font-weight:400">(isteğe bağlı)</span></label>
+    <label for="fisler">{{ "Fiş ya da fatura" if kind == "gider" else "Dekont ya da makbuz" }} <span class="opt">(isteğe bağlı)</span></label>
     <div class="filebox">
       <input id="fisler" type="file" name="fisler" accept="image/*,application/pdf" multiple data-previews="onizleme">
       <div class="previews" id="onizleme"></div>

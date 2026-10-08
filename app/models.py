@@ -44,6 +44,7 @@ class Category(Base):
     kind: Mapped[str] = mapped_column(String(10), default=GIDER)  # gider | gelir
     sort: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    icon: Mapped[str] = mapped_column(String(20), default="etiket", server_default="etiket")
 
     __table_args__ = (UniqueConstraint("name", "kind", name="uq_category_name_kind"),)
 
@@ -187,7 +188,9 @@ DEFAULT_CATEGORIES = {
 def seed_defaults(db: Session) -> None:
     if db.scalar(select(func.count()).select_from(Category)):
         return
+    from .icons import guess_icon
+
     for kind, names in DEFAULT_CATEGORIES.items():
         for i, name in enumerate(names):
-            db.add(Category(name=name, kind=kind, sort=i))
+            db.add(Category(name=name, kind=kind, sort=i, icon=guess_icon(name, kind)))
     db.commit()

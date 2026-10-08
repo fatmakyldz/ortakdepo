@@ -11,58 +11,17 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import User
 from ..security import current_user
-from ..services import exports, reports
+from ..services import charts, exports, reports
 from ..timeutil import add_months, fmt_month, month_bounds, parse_date, parse_month, today
 from ..web import flash, redirect, render
 
 router = APIRouter()
 
-# Grafik ölçüleri (SVG kullanıcı birimi)
-W, H = 720, 250
-PAD_L, PAD_R, PAD_T, PAD_B = 58, 8, 14, 30
-BAR_W, GAP = 15, 2
-
-
-def _bar_path(x: float, y: float, w: float, h: float, r: float = 4) -> str:
-    """Üstü yuvarlak, tabanı düz sütun."""
-    if h <= 0:
-        return ""
-    r = min(r, h, w / 2)
-    return (
-        f"M{x:.1f},{y + h:.1f} V{y + r:.1f} Q{x:.1f},{y:.1f} {x + r:.1f},{y:.1f} "
-        f"H{x + w - r:.1f} Q{x + w:.1f},{y:.1f} {x + w:.1f},{y + r:.1f} V{y + h:.1f} Z"
-    )
-
-
-def trend_chart(points: list[reports.TrendPoint]) -> dict:
-    top = reports.nice_ceiling(max([p.income for p in points] + [p.expense for p in points] + [0]))
-    plot_w, plot_h = W - PAD_L - PAD_R, H - PAD_T - PAD_B
-    band = plot_w / len(points)
-    base = PAD_T + plot_h
-
-    def y_of(v: int) -> float:
-        return base - (v / top) * plot_h
-
-    groups = []
-    for i, p in enumerate(points):
-        cx = PAD_L + band * i + band / 2
-        x_inc = cx - GAP / 2 - BAR_W
-        x_exp = cx + GAP / 2
-        groups.append({
-            "point": p,
-            "cx": round(cx, 1),
-            "band_x": round(PAD_L + band * i, 1),
-            "band_w": round(band, 1),
-            "income_path": _bar_path(x_inc, y_of(p.income), BAR_W, base - y_of(p.income)),
-            "expense_path": _bar_path(x_exp, y_of(p.expense), BAR_W, base - y_of(p.expense)),
-            "month_label": fmt_month(p.year, p.month),
-        })
-    ticks = [{"y": round(y_of(top * k // 4), 1), "value": top * k // 4} for k in range(5)]
-    return {
-        "w": W, "h": H, "base": base, "pad_l": PAD_L, "pad_r": PAD_R, "pad_t": PAD_T,
-        "plot_h": plot_h, "groups": groups, "ticks": ticks,
-        "empty": all(p.income == 0 and p.expense == 0 for p in points),
-    }
+def trend_chart(points: list[reports.TrendPoint], current_key: str) -> dict:
+    return charts.column_chart([
+        charts.Column(p.label, fmt_month(p.year, p.month), p.income, p.expense, p.key == current_key)
+        for p in points
+    ])
 
 
 @router.get("/rapor")
@@ -87,7 +46,7 @@ def report_page(
         "prev_ay": f"{py}-{pm:02d}",
         "next_ay": f"{ny}-{nm:02d}",
         "is_current_month": (year, month) == (t.year, t.month),
-        "chart": trend_chart(points),
+        "chart": trend_chart(points, f"{year}-{month:02d}"),
         "points": points,
         "max_cat": max([c.amount for c in rep.expense_categories] + [1]),
         "year_start": date(year, 1, 1),

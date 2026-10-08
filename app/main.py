@@ -5,7 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -73,3 +73,48 @@ async def _http_error(request: Request, exc: StarletteHTTPException):
 @app.get("/saglik", include_in_schema=False)
 def health():
     return {"durum": "ok"}
+
+
+# ---- Telefona "uygulama gibi" eklenebilme (PWA)
+
+@app.get("/manifest.webmanifest", include_in_schema=False)
+def manifest():
+    return JSONResponse(
+        {
+            "name": settings.app_name,
+            "short_name": settings.app_name.split()[0][:12] if settings.app_name else "Defter",
+            "description": "Günlük gelir, gider ve fiş takibi",
+            "lang": "tr",
+            "start_url": "/",
+            "scope": "/",
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#ffffff",
+            "icons": [
+                {"src": "/static/brand/icon-192.png", "sizes": "192x192", "type": "image/png"},
+                {"src": "/static/brand/icon-512.png", "sizes": "512x512", "type": "image/png"},
+                {"src": "/static/brand/icon-maskable-512.png", "sizes": "512x512", "type": "image/png",
+                 "purpose": "maskable"},
+            ],
+            "shortcuts": [
+                {"name": "Gider ekle", "url": "/kayitlar/yeni?tur=gider"},
+                {"name": "Gelir ekle", "url": "/kayitlar/yeni?tur=gelir"},
+            ],
+        },
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@app.get("/sw.js", include_in_schema=False)
+def service_worker():
+    # Kök dizinden sunulur ki kapsamı tüm site olsun; tarayıcı her seferinde yenisini sorsun
+    return FileResponse(
+        APP_DIR / "static" / "js" / "sw.js", media_type="text/javascript",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/cevrimdisi", include_in_schema=False)
+def offline(request: Request):
+    return render(request, "offline.html")

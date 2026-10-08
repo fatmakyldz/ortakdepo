@@ -88,7 +88,7 @@ def main() -> None:
                 taker = random.choices([fatma.id, kerem.id, None], [2, 2, 6])[0]
                 db.add(Transaction(kind=GELIR, day=day, amount=amount, category_id=cat["İş geliri"],
                                    partner_id=taker, description=random.choice(
-                                       ["Hafriyat, Yılmaz İnşaat", "Nakliye", "Günlük kiralama", "Hakediş"]),
+                                       ["Günlük kiralama, Yılmaz İnşaat", "Mini ekskavatör, Kartal", "Günlük kiralama", "Haftalık kiralama, Pendik"]),
                                    created_by_id=taker or kerem.id))
         db.commit()
 
@@ -98,9 +98,9 @@ def main() -> None:
             y, m = add_months(due.year, due.month, -back)
             d = clamp_day(y, m, due.day)
             db.add(Transaction(kind=GIDER, day=d, amount=42_750_00, category_id=cat["Leasing"],
-                               partner_id=None, description="Ekskavatör leasing (geçmiş taksit)",
+                               partner_id=None, description="Bobcat E34 leasing (geçmiş taksit)",
                                created_by_id=fatma.id))
-        db.add(FixedExpense(name="Ekskavatör leasing", amount=42_750_00, due_day=due.day, first_due=due,
+        db.add(FixedExpense(name="Bobcat E34 leasing", amount=42_750_00, due_day=due.day, first_due=due,
                             total_count=26, category_id=cat["Leasing"], remind_days=5,
                             note="Sözleşme 2025/1184"))
         late = t - timedelta(days=3)

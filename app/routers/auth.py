@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hmac
 import re
 
 from fastapi import APIRouter, Depends, Form, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..db import get_db
 from ..models import User
 from ..security import (
@@ -28,7 +30,7 @@ def user_count(db: Session) -> int:
 def setup_form(request: Request, db: Session = Depends(get_db)):
     if user_count(db):
         return redirect("/giris")
-    return render(request, "setup.html", {"form": {}, "errors": []})
+    return render(request, "setup.html", {"form": {}, "errors": [], "needs_key": bool(settings.setup_key)})
 
 
 @router.post("/kurulum")
@@ -37,12 +39,15 @@ def setup_submit(
     db: Session = Depends(get_db),
     ad1: str = Form(""), eposta1: str = Form(""), sifre1: str = Form(""),
     ad2: str = Form(""), eposta2: str = Form(""), sifre2: str = Form(""),
+    anahtar: str = Form(""),
 ):
     if user_count(db):
         return redirect("/giris")
     form = {"ad1": clean_text(ad1, 80), "eposta1": clean_text(eposta1, 200).lower(),
             "ad2": clean_text(ad2, 80), "eposta2": clean_text(eposta2, 200).lower()}
     errors = []
+    if settings.setup_key and not hmac.compare_digest(anahtar.strip().encode(), settings.setup_key.encode()):
+        errors.append("Kurulum anahtarı hatalı. Sunucu ayarlarındaki KURULUM_ANAHTARI değerini yazın.")
     for n, (ad, eposta, sifre) in enumerate(
         [(form["ad1"], form["eposta1"], sifre1), (form["ad2"], form["eposta2"], sifre2)], 1
     ):
@@ -55,7 +60,10 @@ def setup_submit(
     if form["eposta1"] and form["eposta1"] == form["eposta2"]:
         errors.append("İki ortak aynı e-posta adresini kullanamaz.")
     if errors:
-        return render(request, "setup.html", {"form": form, "errors": errors}, status_code=422)
+        return render(
+            request, "setup.html",
+            {"form": form, "errors": errors, "needs_key": bool(settings.setup_key)}, status_code=422,
+        )
 
     first = User(name=form["ad1"], email=form["eposta1"], password_hash=hash_password(sifre1))
     second = User(name=form["ad2"], email=form["eposta2"], password_hash=hash_password(sifre2))

@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon %}
 {% block title %}Ortak hesabı · {{ app_name }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -24,7 +23,7 @@
             <div class="field"><label for="h-tutar-{{ loop.index }}">Ödenen tutar (₺)</label><input id="h-tutar-{{ loop.index }}" type="text" inputmode="decimal" name="tutar" value="{{ t.amount|tl_input }}" required></div>
             <div class="field"><label for="h-gun-{{ loop.index }}">Tarih</label><input id="h-gun-{{ loop.index }}" type="date" name="gun" value="{{ today.isoformat() }}" min="2000-01-01" max="{{ today.isoformat() }}" required></div>
           </div>
-          <div class="field"><label for="h-not-{{ loop.index }}">Not <span class="muted" style="font-weight:400">(isteğe bağlı)</span></label><input id="h-not-{{ loop.index }}" type="text" name="aciklama" maxlength="300" placeholder="Örnek: havale, elden"></div>
+          <div class="field"><label for="h-not-{{ loop.index }}">Not <span class="opt">(isteğe bağlı)</span></label><input id="h-not-{{ loop.index }}" type="text" name="aciklama" maxlength="300" placeholder="Örnek: havale, elden"></div>
           <div class="form-actions"><button class="btn btn-primary" type="submit">{{ t.from_user.name }} ödedi, kaydet</button></div>
         </form>
       </details>
@@ -91,7 +90,7 @@
           <div class="field"><label for="m-tutar">Tutar (₺)</label><input id="m-tutar" type="text" inputmode="decimal" name="tutar" placeholder="0,00" required></div>
           <div class="field"><label for="m-gun">Tarih</label><input id="m-gun" type="date" name="gun" value="{{ today.isoformat() }}" min="2000-01-01" max="{{ today.isoformat() }}" required></div>
         </div>
-        <div class="field"><label for="m-not">Not <span class="muted" style="font-weight:400">(isteğe bağlı)</span></label><input id="m-not" type="text" name="aciklama" maxlength="300"></div>
+        <div class="field"><label for="m-not">Not <span class="opt">(isteğe bağlı)</span></label><input id="m-not" type="text" name="aciklama" maxlength="300"></div>
         <div class="form-actions"><button class="btn btn-primary" type="submit">Ödemeyi kaydet</button></div>
       </form>
     </details>

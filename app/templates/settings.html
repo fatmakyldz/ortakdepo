@@ -1,19 +1,30 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon %}
 {% block title %}Ayarlar · {{ app_name }}{% endblock %}
 {% macro cat_list(cats) %}
-<ul class="tx-list">
+<ul>
   {% for c in cats %}
-  <li style="padding:10px 0">
-    <form method="post" action="/ayarlar/kategori/{{ c.id }}/ad" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-      <label class="sr-only" for="kat-{{ c.id }}">Kategori adı</label>
-      <input id="kat-{{ c.id }}" type="text" name="ad" value="{{ c.name }}" maxlength="60" required style="flex:1 1 180px;min-height:40px{{ ';color:var(--muted)' if not c.is_active }}">
-      <button class="btn btn-quiet btn-small" type="submit">Adı kaydet</button>
-      <button class="btn btn-quiet btn-small" type="submit" formaction="/ayarlar/kategori/{{ c.id }}/durum">
-        {%- if not c.is_active %}Yeniden aç{% elif used.get(c.id) %}Kullanımdan kaldır{% else %}Sil{% endif -%}
-      </button>
+  <li {% if not loop.first %}style="border-top:1px solid var(--line)"{% endif %}>
+    <form class="cat-edit" method="post" action="/ayarlar/kategori/{{ c.id }}/ad">
+      <span class="cat-ic{{ ' is-gelir' if c.kind == 'gelir' }}" aria-hidden="true">{{ ikon(c.icon) }}</span>
+      <div class="row">
+        <label class="sr-only" for="kat-{{ c.id }}">Kategori adı</label>
+        <input id="kat-{{ c.id }}" type="text" name="ad" value="{{ c.name }}" maxlength="60" required {% if not c.is_active %}style="color:var(--muted)"{% endif %}>
+        <button class="btn btn-quiet btn-small" type="submit">Kaydet</button>
+        <button class="btn btn-quiet btn-small" type="submit" formaction="/ayarlar/kategori/{{ c.id }}/durum">
+          {%- if not c.is_active %}Yeniden aç{% elif used.get(c.id) %}Kullanımdan kaldır{% else %}Sil{% endif -%}
+        </button>
+      </div>
+      <details class="disclose quiet">
+        <summary>Simgeyi değiştir</summary>
+        <div class="chips chips-icons" role="radiogroup" aria-label="{{ c.name }} için simge">
+          {% for key, label in CATEGORY_ICONS.items() %}
+          <label class="chip"><input type="radio" name="simge" value="{{ key }}" {{ "checked" if c.icon == key }}><span>{{ ikon(key) }}{{ label }}</span></label>
+          {% endfor %}
+        </div>
+        <p class="hint" style="margin-top:8px">Seçip “Kaydet”e basın.</p>
+      </details>
+      {% if not c.is_active %}<span class="hint" style="grid-column:2">Kullanımdan kaldırıldı, {{ used.get(c.id, 0) }} eski kayıtta duruyor.</span>{% endif %}
     </form>
-    {% if not c.is_active %}<span class="hint">Kullanımdan kaldırıldı, {{ used.get(c.id, 0) }} eski kayıtta duruyor.</span>{% endif %}
   </li>
   {% endfor %}
 </ul>
@@ -30,7 +41,7 @@
         <div class="field"><label for="p-eposta">E-posta</label><input id="p-eposta" type="email" name="eposta" value="{{ user.email }}" required></div>
       </div>
       <label style="display:flex;gap:10px;align-items:flex-start">
-        <input type="checkbox" name="bildirim" value="1" {{ "checked" if user.notify_email }} style="width:20px;height:20px;margin-top:2px;flex:none">
+        <input type="checkbox" name="bildirim" value="1" {{ "checked" if user.notify_email }} style="margin-top:2px">
         <span>Ödeme günü yaklaşınca bana e-posta gönder</span>
       </label>
       <div class="form-actions"><button class="btn btn-primary" type="submit">Bilgileri kaydet</button></div>
@@ -49,6 +60,42 @@
     </form>
   </section>
 
+  <section class="card" id="gorunum" aria-labelledby="gorunum-baslik">
+    <h2 id="gorunum-baslik">Görünüm</h2>
+    <fieldset>
+      <legend>Tema</legend>
+      <div class="chips" data-theme-choice>
+        <label class="chip"><input type="radio" name="tema" value="sistem" checked><span>Cihaza uy</span></label>
+        <label class="chip"><input type="radio" name="tema" value="acik"><span>{{ ikon("gunes") }}Açık</span></label>
+        <label class="chip"><input type="radio" name="tema" value="koyu"><span>{{ ikon("ay") }}Koyu</span></label>
+      </div>
+      <span class="hint">Seçim yalnızca bu cihazda geçerlidir.</span>
+    </fieldset>
+  </section>
+
+  <section class="card" id="telefon" aria-labelledby="telefon-baslik">
+    <h2 id="telefon-baslik">Telefona uygulama gibi ekleyin</h2>
+    <p style="margin-bottom:14px">Ana ekranda simgesi olur, dokununca adres çubuğu olmadan tam ekran açılır. Mağazadan bir şey indirmek gerekmez.</p>
+    <div class="grid-2">
+      <div>
+        <h3 style="margin-bottom:8px">iPhone (Safari)</h3>
+        <ol class="steps">
+          <li><span>Bu sayfayı Safari'de açın.</span></li>
+          <li><span>Alttaki Paylaş düğmesine dokunun.</span></li>
+          <li><span>“Ana Ekrana Ekle”yi seçin.</span></li>
+        </ol>
+      </div>
+      <div>
+        <h3 style="margin-bottom:8px">Android (Chrome)</h3>
+        <ol class="steps">
+          <li><span>Bu sayfayı Chrome'da açın.</span></li>
+          <li><span>Sağ üstteki üç nokta menüsüne dokunun.</span></li>
+          <li><span>“Uygulamayı yükle” ya da “Ana ekrana ekle”yi seçin.</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
   <section class="card" id="paylar" aria-labelledby="pay-baslik">
     <h2 id="pay-baslik">Ortaklık payları</h2>
     <p class="hint" style="margin-bottom:12px">Kâr ve gider bu oranla bölüşülür. Ortak bakiyesi geçmiş kayıtlar dahil yeni orana göre yeniden hesaplanır.</p>
@@ -64,16 +111,17 @@
 
   <section class="card" id="kategoriler" aria-labelledby="kat-baslik">
     <h2 id="kat-baslik">Kategoriler</h2>
-    <h3 style="margin-top:4px">Gider</h3>
+    <h3 class="muted small">Gider</h3>
     {{ cat_list(expense_cats) }}
-    <h3 style="margin-top:18px">Gelir</h3>
+    <h3 class="muted small" style="margin-top:18px">Gelir</h3>
     {{ cat_list(income_cats) }}
-    <form method="post" action="/ayarlar/kategori" style="margin-top:18px;padding-top:16px;border-top:2px solid var(--ink)">
+    <form method="post" action="/ayarlar/kategori" style="margin-top:18px;padding-top:18px;border-top:1.5px solid var(--ink)">
       <div class="grid-2" style="align-items:end">
         <div class="field"><label for="k-ad">Yeni kategori</label><input id="k-ad" type="text" name="ad" maxlength="60" placeholder="Örnek: Otoyol / köprü" required></div>
         <div class="field"><label for="k-tur">Türü</label><select id="k-tur" name="tur"><option value="gider">Gider</option><option value="gelir">Gelir</option></select></div>
         <button class="btn" type="submit">Kategori ekle</button>
       </div>
+      <p class="hint" style="margin-top:8px">Simge adına göre seçilir; sonradan değiştirebilirsiniz.</p>
     </form>
   </section>
 
@@ -83,12 +131,12 @@
     <p>Açık. Hatırlatmalar <b>{{ smtp_from }}</b> adresinden, her gün saat {{ "%02d"|format(reminder_hour) }}.00'dan sonra gönderilir: vade yaklaşınca, vade günü ve ödeme gecikirse haftada bir.</p>
     <form method="post" action="/ayarlar/test-eposta" style="margin-top:12px"><button class="btn" type="submit">Bana deneme e-postası gönder</button></form>
     {% elif smtp_ok %}
-    <p>E-posta sunucusu tanımlı ama hatırlatmalar kapalı. Açmak için sunucudaki <code>.env</code> dosyasında <code>REMINDERS_ENABLED=1</code> yapın.</p>
+    <p>E-posta sunucusu tanımlı ama hatırlatmalar kapalı. Açmak için sunucu ayarlarında <code>REMINDERS_ENABLED=1</code> yapın.</p>
     {% else %}
-    <p>E-posta sunucusu tanımlı değil; uyarılar şimdilik yalnızca bu sayfalarda görünür. Açmak için sunucudaki <code>.env</code> dosyasına SMTP bilgilerini yazıp uygulamayı yeniden başlatın. Adımlar README dosyasında.</p>
+    <p>E-posta sunucusu tanımlı değil; uyarılar şimdilik yalnızca bu sayfalarda görünür. Açmak için sunucu ayarlarına şirket e-postanızın SMTP bilgilerini yazıp uygulamayı yeniden başlatın. Adımlar README dosyasında.</p>
     {% endif %}
   </section>
 
-  <form method="post" action="/cikis"><button class="btn btn-quiet" type="submit">Çıkış yap</button></form>
+  <form method="post" action="/cikis"><button class="btn btn-quiet" type="submit">{{ ikon("cikis") }}Çıkış yap</button></form>
 </div>
 {% endblock %}

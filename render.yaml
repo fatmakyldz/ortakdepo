@@ -1,0 +1,23 @@
+# Render üzerinde tek tıkla kurulum (Blueprint). Kullanımı README.md > "Buluta kurmak" bölümünde.
+services:
+  - type: web
+    name: sezkar-muhasebe
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: 0.5c-512mb          # kalıcı disk ücretsiz planda yok; en küçük ücretli plan yeterli
+    region: frankfurt         # Türkiye'ye en yakın bölge; sonradan değiştirilemez
+    healthCheckPath: /saglik
+    autoDeployTrigger: commit # main dalına her gönderimde kendiliğinden güncellenir
+    disk:
+      name: veri              # veritabanı ve fişler; Render her gün yedeğini alır
+      mountPath: /var/data
+      sizeGB: 2               # sonradan büyütülebilir, küçültülemez
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+      - key: HTTPS_ONLY
+        value: "1"
+      - key: TZ_NAME
+        value: Europe/Istanbul
+      - key: KURULUM_ANAHTARI # ilk kurulum sayfasında sorulur; değeri Environment sekmesinde
+        generateValue: true

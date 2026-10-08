@@ -44,6 +44,7 @@ class Settings:
     reminder_hour: int
     reminders_enabled: bool
     max_upload_mb: int
+    setup_key: str
 
     @property
     def db_path(self) -> Path:
@@ -78,6 +79,20 @@ def _secret_key(data_dir: Path) -> str:
     return key
 
 
+def _base_url() -> str:
+    """Sitenin dış adresi. Verilmediyse bulut servisinin kendi bildirdiği adres kullanılır."""
+    explicit = os.environ.get("BASE_URL", "").strip()
+    if explicit:
+        return explicit.rstrip("/")
+    render = os.environ.get("RENDER_EXTERNAL_URL", "").strip()
+    if render:
+        return render.rstrip("/")
+    railway = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
+    if railway:
+        return f"https://{railway}".rstrip("/")
+    return "http://localhost:8000"
+
+
 def load_settings() -> Settings:
     data_dir = Path(os.environ.get("DATA_DIR", BASE_DIR / "data")).resolve()
     try:
@@ -86,14 +101,13 @@ def load_settings() -> Settings:
     except PermissionError:
         raise SystemExit(
             f"Veri klasörüne yazılamıyor: {data_dir}\n"
-            "Klasörün sahibi uygulamayı çalıştıran kullanıcı olmalı. "
-            "Docker kurulumunda: sudo chown -R 10001:10001 ./veri"
+            "Klasörün sahibi uygulamayı çalıştıran kullanıcı olmalı."
         ) from None
     return Settings(
-        app_name=os.environ.get("APP_NAME", "Ortak Defter"),
+        app_name=os.environ.get("APP_NAME", "Sezkar Muhasebe"),
         data_dir=data_dir,
         secret_key=_secret_key(data_dir),
-        base_url=os.environ.get("BASE_URL", "http://localhost:8000").rstrip("/"),
+        base_url=_base_url(),
         https_only=_bool("HTTPS_ONLY", False),
         timezone=ZoneInfo(os.environ.get("TZ_NAME", "Europe/Istanbul")),
         smtp_host=os.environ.get("SMTP_HOST", "").strip(),
@@ -105,6 +119,7 @@ def load_settings() -> Settings:
         reminder_hour=_int("REMINDER_HOUR", 9),
         reminders_enabled=_bool("REMINDERS_ENABLED", True),
         max_upload_mb=_int("MAX_UPLOAD_MB", 15),
+        setup_key=os.environ.get("KURULUM_ANAHTARI", "").strip(),
     )
 
 

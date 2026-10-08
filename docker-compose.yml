@@ -5,9 +5,8 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      # Veritabanı ve fişler burada; yedeğini alın. Uygulama kapsayıcıda 10001 numaralı
-      # kullanıcıyla çalışır, bu yüzden ilk kurulumdan önce klasörü ona verin:
-      #   mkdir -p veri && sudo chown -R 10001:10001 veri
+      # Veritabanı ve fişler burada; yedeğini alın. Kapsayıcı açılırken klasörü
+      # uygulama kullanıcısına (10001) kendisi verir, elle bir şey yapmak gerekmez.
       - ./veri:/data
     expose:
       - "8000"

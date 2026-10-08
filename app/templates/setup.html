@@ -3,11 +3,22 @@
 {% block body %}
 <main class="auth">
   <div class="auth-box wide">
-    <span class="brand">{{ app_name }}</span>
-    <p>Defteri iki ortak birlikte kullanacak. İkinizin giriş bilgilerini bir kez tanımlayın; herkes şifresini sonra Ayarlar'dan değiştirebilir.</p>
+    <div class="auth-brand">
+      <img class="on-light" src="/static/brand/sezkar-logo-acik-zemin.png" width="1248" height="267" alt="Sezkar">
+      <img class="on-dark" src="/static/brand/sezkar-logo-koyu-zemin.png" width="1248" height="267" alt="Sezkar">
+      <span>MUHASEBE</span>
+    </div>
+    <p>İki ortağın giriş bilgilerini bir kez tanımlayın. Şirket e-postalarınızı yazın; ödeme hatırlatmaları bu adreslere gelir. Herkes şifresini sonra Ayarlar'dan değiştirebilir.</p>
     <div class="card">
       {% if errors %}<ul class="errors" role="alert">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
       <form class="form" method="post" action="/kurulum">
+        {% if needs_key %}
+        <div class="field">
+          <label for="anahtar">Kurulum anahtarı</label>
+          <input id="anahtar" type="password" name="anahtar" autocomplete="off" required>
+          <span class="hint">Sunucu ayarlarındaki <code>KURULUM_ANAHTARI</code> değeri. Defteri sizden başkasının kurmasını engeller.</span>
+        </div>
+        {% endif %}
         {% for n in (1, 2) %}
         <fieldset class="partner-set">
           <legend>{{ n }}. ortak{% if n == 1 %} (siz){% endif %}</legend>
@@ -24,7 +35,7 @@
           <div class="field">
             <label for="sifre{{ n }}">Şifre</label>
             <input id="sifre{{ n }}" type="password" name="sifre{{ n }}" minlength="8" autocomplete="new-password" required>
-            <span class="hint">En az 8 karakter. Ödeme hatırlatmaları bu e-posta adresine gelir.</span>
+            <span class="hint">En az 8 karakter.</span>
           </div>
         </fieldset>
         {% endfor %}

@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .. import icons
 from ..config import settings
 from ..db import get_db
 from ..models import GELIR, GIDER, Category, Transaction, User
@@ -129,7 +130,7 @@ def add_category(
             flash(request, f"“{existing.name}” yeniden kullanıma açıldı.")
         return redirect("/ayarlar")
     top = db.scalar(select(func.max(Category.sort)).where(Category.kind == kind)) or 0
-    db.add(Category(name=name, kind=kind, sort=top + 1))
+    db.add(Category(name=name, kind=kind, sort=top + 1, icon=icons.guess_icon(name, kind)))
     try:
         db.commit()
     except IntegrityError:
@@ -161,11 +162,13 @@ def _get_category(db: Session, cat_id: int) -> Category:
 
 @router.post("/ayarlar/kategori/{cat_id}/ad")
 def rename_category(
-    request: Request, cat_id: int, ad: str = Form(""),
+    request: Request, cat_id: int, ad: str = Form(""), simge: str = Form(""),
     db: Session = Depends(get_db), user: User = Depends(current_user),
 ):
     cat = _get_category(db, cat_id)
     name = clean_text(ad, 60)
+    if simge in icons.CATEGORY_ICONS:
+        cat.icon = simge
     if not name:
         flash(request, "Kategori adı boş olamaz.", "hata")
     elif _same_name(db, cat.kind, name, exclude_id=cat.id):
@@ -174,7 +177,7 @@ def rename_category(
         cat.name = name
         try:
             db.commit()
-            flash(request, "Kategori adı değişti.")
+            flash(request, "Kategori güncellendi.")
         except IntegrityError:
             db.rollback()
             flash(request, f"“{name}” adında başka bir kategori var.", "hata")

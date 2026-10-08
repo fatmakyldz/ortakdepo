@@ -1,6 +1,50 @@
-// Ortak Defter: küçük kolaylıklar. Sayfalar JavaScript olmadan da çalışır.
+// Sezkar Muhasebe: küçük kolaylıklar. Sayfalar JavaScript olmadan da çalışır.
 (function () {
   "use strict";
+
+  // --- Tema: düğme açık/koyu arasında geçer; Ayarlar'daki seçim "cihaza uy"u da sunar
+  var root = document.documentElement;
+  var media = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+
+  function savedTheme() {
+    try { return localStorage.getItem("tema"); } catch (e) { return null; }
+  }
+  function isDark() {
+    var forced = root.getAttribute("data-theme");
+    return forced ? forced === "dark" : !!(media && media.matches);
+  }
+  function syncTheme() {
+    var meta = document.querySelector("meta[data-theme-color]");
+    if (meta) meta.setAttribute("content", isDark() ? "#17181b" : "#ffffff");
+    var current = savedTheme();
+    if (current !== "acik" && current !== "koyu") current = "sistem";
+    document.querySelectorAll("[data-theme-choice] input").forEach(function (input) {
+      input.checked = input.value === current;
+    });
+  }
+  function setTheme(choice) {
+    try {
+      if (choice === "sistem") localStorage.removeItem("tema"); else localStorage.setItem("tema", choice);
+    } catch (e) { /* kaydedilemese de bu sayfa için uygulanır */ }
+    if (choice === "sistem") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", choice === "koyu" ? "dark" : "light");
+    syncTheme();
+  }
+  document.querySelectorAll("[data-theme-toggle]").forEach(function (btn) {
+    btn.addEventListener("click", function () { setTheme(isDark() ? "acik" : "koyu"); });
+  });
+  document.querySelectorAll("[data-theme-choice] input").forEach(function (input) {
+    input.addEventListener("change", function () { if (input.checked) setTheme(input.value); });
+  });
+  if (media && media.addEventListener) media.addEventListener("change", syncTheme);
+  syncTheme();
+
+  // --- Telefona eklenince çevrimdışı sayfası ve hızlı açılış için servis çalışanı
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("/sw.js").catch(function () { /* destek yoksa sorun değil */ });
+    });
+  }
 
   // --- Tutar: yazarken nasıl kaydedileceğini göster (sunucudaki kuralın aynısı)
   var UNIT = /^₺|(₺|tl|try)$/i;
@@ -123,6 +167,11 @@
     });
   }
 
+  // --- Dar ekranda grafik yana kayar; en yeni günler/aylar sağda olduğu için oradan başlat
+  document.querySelectorAll("[data-scroll-end]").forEach(function (box) {
+    box.scrollLeft = box.scrollWidth;
+  });
+
   // --- Grafik: sütunun üzerine gelince ayın değerleri
   document.querySelectorAll("[data-chart]").forEach(function (box) {
     var svg = box.querySelector("svg");
@@ -153,7 +202,7 @@
       title.textContent = col.getAttribute("data-label");
       tip.appendChild(title);
       tip.appendChild(row("", "Gelir", col.getAttribute("data-gelir"), css.getPropertyValue("--gelir")));
-      tip.appendChild(row("", "Gider", col.getAttribute("data-gider"), css.getPropertyValue("--gider")));
+      tip.appendChild(row("", "Gider", col.getAttribute("data-gider"), css.getPropertyValue("--brand")));
       tip.appendChild(row("t-net", "Net", col.getAttribute("data-net")));
       tip.hidden = false;
       var scale = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;

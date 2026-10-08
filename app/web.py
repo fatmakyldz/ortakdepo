@@ -8,7 +8,7 @@ from fastapi import Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from . import money, timeutil
+from . import icons, money, timeutil
 from .config import settings
 
 APP_DIR = Path(__file__).resolve().parent
@@ -23,7 +23,9 @@ templates.env.filters.update(
     tarih_kisa=timeutil.fmt_date_short,
     gun_adi=timeutil.fmt_day_name,
 )
-templates.env.globals.update(app_name=settings.app_name, AYLAR=timeutil.AYLAR)
+templates.env.globals.update(
+    app_name=settings.app_name, AYLAR=timeutil.AYLAR, ikon=icons.svg, CATEGORY_ICONS=icons.CATEGORY_ICONS,
+)
 
 
 def _asset_version() -> str:

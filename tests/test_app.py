@@ -348,3 +348,105 @@ def test_deleting_payment_of_ended_fixed_expense_leaves_no_hidden_debt(logged_in
     tx = db.query(Transaction).one()
     c.post(f"/kayitlar/{tx.id}/sil")
     assert db.query(Installment).count() == 0 and db.query(Transaction).count() == 0
+
+
+# ---------------------------------------------------------------- yeni tasarım, simgeler, telefona ekleme
+
+def test_install_files_are_public_and_valid(client, db):
+    m = client.get("/manifest.webmanifest")
+    assert m.status_code == 200 and m.json()["display"] == "standalone"
+    for icon in m.json()["icons"]:
+        assert client.get(icon["src"]).status_code == 200, icon
+    sw = client.get("/sw.js")
+    assert sw.status_code == 200 and "javascript" in sw.headers["content-type"] and "/cevrimdisi" in sw.text
+    off = client.get("/cevrimdisi")
+    assert off.status_code == 200 and "Bağlantı yok" in off.text
+    for path in ["/static/brand/apple-touch-icon.png", "/static/brand/favicon.png", "/static/js/theme.js",
+                 "/static/fonts/archivo-latin-wdth-normal.woff2", "/static/fonts/archivo-latin-ext-wdth-normal.woff2"]:
+        assert client.get(path).status_code == 200, path
+
+
+def test_setup_key_is_required_when_configured(client, db, monkeypatch):
+    from app.config import settings as cfg
+    monkeypatch.setattr(cfg, "setup_key", "cok-gizli-anahtar")
+    data = {"ad1": "F", "eposta1": "f@x.co", "sifre1": "gizli-sifre-1",
+            "ad2": "K", "eposta2": "k@x.co", "sifre2": "gizli-sifre-2"}
+    assert "Kurulum anahtarı" in client.get("/kurulum").text
+    assert client.post("/kurulum", data=data).status_code == 422
+    assert client.post("/kurulum", data={**data, "anahtar": "yanlis"}).status_code == 422
+    assert db.query(User).count() == 0
+    r = client.post("/kurulum", data={**data, "anahtar": "cok-gizli-anahtar"}, follow_redirects=False)
+    assert r.status_code == 303 and db.query(User).count() == 2
+
+
+def test_categories_get_icons_and_icon_can_change(logged_in, db):
+    c = logged_in
+    icons = {cat.name: cat.icon for cat in db.query(Category)}
+    assert icons["Yakıt"] == "yakit" and icons["Yevmiye"] == "isci" and icons["Yemek"] == "yemek"
+    assert icons["Bakım / Onarım"] == "anahtar" and icons["Leasing"] == "belge" and icons["İş geliri"] == "canta"
+    c.post("/ayarlar/kategori", data={"ad": "Otoyol / köprü", "tur": "gider"})
+    c.post("/ayarlar/kategori", data={"ad": "Bilinmeyen şey", "tur": "gider"})
+    assert db.query(Category).filter_by(name="Otoyol / köprü").one().icon == "yol"
+    other = db.query(Category).filter_by(name="Bilinmeyen şey").one()
+    assert other.icon == "etiket"
+    c.post(f"/ayarlar/kategori/{other.id}/ad", data={"ad": "Bilinmeyen şey", "simge": "kalkan"})
+    c.post(f"/ayarlar/kategori/{other.id}/ad", data={"ad": "Bilinmeyen şey", "simge": "<script>"})   # yok sayılır
+    db.refresh(other)
+    assert other.icon == "kalkan"
+
+
+def test_old_database_gets_icon_column(db):
+    from sqlalchemy import inspect, text
+    from app.db import _upgrade_schema, engine
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE categories"))
+        conn.execute(text("CREATE TABLE categories (id INTEGER PRIMARY KEY, name VARCHAR(60), kind VARCHAR(10), "
+                          "sort INTEGER, is_active BOOLEAN)"))
+        conn.execute(text("INSERT INTO categories (name, kind, sort, is_active) VALUES "
+                          "('Yakıt','gider',0,1), ('Kasko','gider',1,1), ('İş geliri','gelir',0,1)"))
+    _upgrade_schema()
+    assert "icon" in {col["name"] for col in inspect(engine).get_columns("categories")}
+    with engine.connect() as conn:
+        got = dict(conn.execute(text("SELECT name, icon FROM categories")).all())
+    assert got == {"Yakıt": "yakit", "Kasko": "kalkan", "İş geliri": "canta"}
+    _upgrade_schema()   # ikinci kez çalışınca sorun çıkmaz
+
+
+def test_dashboard_summary_and_charts(logged_in, db):
+    c = logged_in
+    empty = c.get("/").text
+    assert "Bu ay için kayıt yok" in empty and "data-chart" not in empty
+    t = today()
+    for tutar, kat, tur in [("1.000", "Yakıt", "gider"), ("250,50", "Yemek", "gider"), ("4.000", "İş geliri", "gelir")]:
+        c.post("/kayitlar/yeni", data={"tur": tur, "gun": t.isoformat(), "tutar": tutar,
+                                       "kategori_id": str(_cat(db, kat)), "kim": "ortak"})
+    page = c.get("/").text
+    assert "2.749,50 ₺" in page                      # net
+    assert "4.000,00 ₺" in page and "1.250,50 ₺" in page
+    assert page.count('class="col"') == 14           # 14 günlük grafik
+    assert "Bu ay gider nereye gitti?" in page and "%80" in page and "%20" in page
+
+
+def test_daily_series_and_top_categories(db):
+    from datetime import date
+    from app.services import reports
+    from app.services.reports import CategoryRow
+    cat = db.query(Category).filter_by(name="Yakıt").one()
+    db.add_all([
+        Transaction(kind="gider", day=date(2026, 10, 1), amount=500, category_id=cat.id),
+        Transaction(kind="gider", day=date(2026, 9, 30), amount=300, category_id=cat.id),
+        Transaction(kind="gelir", day=date(2026, 10, 1), amount=900, category_id=cat.id),
+        Transaction(kind="gider", day=date(2026, 9, 10), amount=999, category_id=cat.id),   # aralık dışı
+    ])
+    db.commit()
+    series = reports.daily_series(db, date(2026, 10, 2), 14)
+    assert len(series) == 14 and series[0].day == date(2026, 9, 19) and series[-1].day == date(2026, 10, 2)
+    by_day = {p.day: (p.income, p.expense) for p in series}
+    assert by_day[date(2026, 10, 1)] == (900, 500) and by_day[date(2026, 9, 30)] == (0, 300)
+    assert sum(p.expense for p in series) == 800
+
+    rows = [CategoryRow(f"K{i}", 100 - i, 1, 10.0) for i in range(9)]
+    top = reports.top_categories(rows, 5)
+    assert len(top) == 6 and top[-1].name == "Diğer 4 kategori"
+    assert sum(r.amount for r in top) == sum(r.amount for r in rows)
+    assert reports.top_categories(rows[:6], 5) == rows[:6]   # tek satır için "Diğer" açılmaz

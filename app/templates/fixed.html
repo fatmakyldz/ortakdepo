@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon, pay_form %}
+{% from "_macros.html" import pay_form, due_pill %}
 {% block title %}Sabit giderler · {{ app_name }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -13,18 +13,18 @@
 
 <div class="stack-l">
   {% if unpaid %}
-  <section class="card" aria-labelledby="bekleyen-baslik">
+  <section class="card due-card" aria-labelledby="bekleyen-baslik">
     <div class="card-head">
       <h2 id="bekleyen-baslik">Ödenecekler</h2>
       <span class="num"><b>{{ unpaid_total|tl }}</b></span>
     </div>
-    <ul class="due-list">
+    <ul>
       {% for item in unpaid %}
-      <li class="{{ item.state }}">
+      <li>
         <div class="due-row">
           <b>{{ item.installment.fixed.name }}{% if item.installment.fixed.total_count %} <span class="muted" style="font-weight:400">{{ item.installment.seq }}/{{ item.installment.fixed.total_count }}</span>{% endif %}</b>
           <span class="num">{{ item.installment.amount|tl }}</span>
-          <span class="when">Vade {{ item.installment.due_date|tarih }}, {{ item.when_text|lower }}</span>
+          <span class="when">{{ due_pill(item) }}<span>Vade {{ item.installment.due_date|tarih }}</span></span>
         </div>
         {{ pay_form(item, partners, user, today, "/sabit") }}
       </li>
@@ -39,7 +39,10 @@
     {% for c in cards %}
     <div class="card fx-card">
       <div class="fx-top">
-        <h3>{{ c.fx.name }}</h3>
+        <div class="fx-name">
+          <span class="cat-ic" aria-hidden="true">{{ ikon(c.fx.category.icon if c.fx.category else "belge") }}</span>
+          <h3>{{ c.fx.name }}</h3>
+        </div>
         <span class="num">{{ c.fx.amount|tl }} <span class="muted small" style="font-weight:400">/ ay</span></span>
       </div>
       <p class="fx-meta">
@@ -85,7 +88,7 @@
         <div class="grid-2">
           <div class="field">
             <label for="n-ad">Ad</label>
-            <input id="n-ad" type="text" name="ad" value="{{ form.ad }}" placeholder="Örnek: Kamyon leasing" required>
+            <input id="n-ad" type="text" name="ad" value="{{ form.ad }}" placeholder="Örnek: Bobcat E34 leasing" required>
           </div>
           <div class="field">
             <label for="n-tutar">Aylık tutar (₺)</label>
@@ -113,7 +116,7 @@
           </div>
         </div>
         <div class="field">
-          <label for="n-not">Not <span class="muted" style="font-weight:400">(isteğe bağlı)</span></label>
+          <label for="n-not">Not <span class="opt">(isteğe bağlı)</span></label>
           <input id="n-not" type="text" name="not" maxlength="300" value="{{ form.not }}" placeholder="Örnek: sözleşme no, banka">
         </div>
         <div class="form-actions"><button class="btn btn-primary" type="submit">Sabit gideri ekle</button></div>

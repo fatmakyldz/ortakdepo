@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon, month_nav %}
+{% from "_macros.html" import month_nav, column_chart %}
 {% block title %}Rapor, {{ month_label }} · {{ app_name }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -16,10 +16,10 @@
       <dl class="statement">
         <div><dt>Gelir</dt><dd>{{ rep.income|tl }}</dd></div>
         <div><dt>Gider</dt><dd>{{ rep.expense|tl }}</dd></div>
-        <div class="total"><dt>{{ "Zarar" if rep.net < 0 else "Kâr" }}</dt><dd class="{{ 'gider' if rep.net < 0 else '' }}">{{ rep.net|tl }}</dd></div>
+        <div class="total"><dt>{{ "Zarar" if rep.net < 0 else "Kâr" }}</dt><dd class="{{ 'eksi' if rep.net < 0 else '' }}">{{ rep.net|tl }}</dd></div>
         {% if rep.unpaid_fixed %}
         <div><dt>Bu ay vadesi gelen, ödenmemiş sabit giderler ({{ rep.unpaid_fixed_count }})</dt><dd>−{{ rep.unpaid_fixed|tl }}</dd></div>
-        <div class="after"><dt>Onlar da ödenince</dt><dd class="{{ 'gider' if rep.net_after_fixed < 0 else '' }}">{{ rep.net_after_fixed|tl }}</dd></div>
+        <div><dt>Onlar da ödenince</dt><dd class="{{ 'eksi' if rep.net_after_fixed < 0 else '' }}">{{ rep.net_after_fixed|tl }}</dd></div>
         {% endif %}
       </dl>
       {% if has_prev %}
@@ -33,7 +33,8 @@
       <ul class="cat-bars">
         {% for c in rep.expense_categories %}
         <li>
-          <span class="name">{{ c.name }} <small>%{{ "%.0f"|format(c.pct) }}, {{ c.count }} kayıt</small></span>
+          <span class="cat-ic is-small" aria-hidden="true">{{ ikon(c.icon) }}</span>
+          <span class="name">{{ c.name }}<small>%{{ "%.0f"|format(c.pct) }}, {{ c.count }} kayıt</small></span>
           <span class="num">{{ c.amount|tl }}</span>
           <div class="track" aria-hidden="true"><div class="fill" style="width: {{ '%.2f'|format(c.amount / max_cat * 100) }}%"></div></div>
         </li>
@@ -50,31 +51,7 @@
     {% if chart.empty %}
     <p class="muted">Kayıt girildikçe aylık gelir ve gider burada yan yana görünecek.</p>
     {% else %}
-    <div class="legend" aria-hidden="true">
-      <span class="k-gelir"><i></i>Gelir</span>
-      <span class="k-gider"><i></i>Gider</span>
-    </div>
-    <div class="chart-scroll">
-      <div class="chart-box" data-chart>
-        <svg viewBox="0 0 {{ chart.w }} {{ chart.h }}" role="group" aria-label="Son 12 ayın aylık gelir ve gider sütun grafiği. Değerler aşağıdaki tabloda da var.">
-          {% for t in chart.ticks %}
-          <line class="{{ 'base' if loop.first else 'grid' }}" x1="{{ chart.pad_l }}" x2="{{ chart.w - chart.pad_r }}" y1="{{ t.y }}" y2="{{ t.y }}"/>
-          <text class="tick" x="{{ chart.pad_l - 8 }}" y="{{ t.y + 4 }}" text-anchor="end">{{ t.value|kisa }}</text>
-          {% endfor %}
-          {% for g in chart.groups %}
-          <g class="col" tabindex="0" role="img"
-             aria-label="{{ g.month_label }}: gelir {{ g.point.income|tl }}, gider {{ g.point.expense|tl }}, net {{ g.point.net|tl }}"
-             data-label="{{ g.month_label }}" data-gelir="{{ g.point.income|tl }}" data-gider="{{ g.point.expense|tl }}" data-net="{{ g.point.net|tl }}" data-cx="{{ g.cx }}">
-            <rect class="hit" x="{{ g.band_x }}" y="{{ chart.pad_t }}" width="{{ g.band_w }}" height="{{ chart.plot_h + 22 }}" rx="4"/>
-            {% if g.income_path %}<path class="bar-gelir" d="{{ g.income_path }}"/>{% endif %}
-            {% if g.expense_path %}<path class="bar-gider" d="{{ g.expense_path }}"/>{% endif %}
-            <text class="xlab {{ 'current' if g.point.key == ay }}" x="{{ g.cx }}" y="{{ chart.base + 18 }}" text-anchor="middle">{{ g.point.label }}</text>
-          </g>
-          {% endfor %}
-        </svg>
-        <div class="tip" hidden></div>
-      </div>
-    </div>
+    {{ column_chart(chart, "Son 12 ayın aylık gelir ve gider sütun grafiği. Değerler aşağıdaki tabloda da var.") }}
     <details class="disclose" style="margin-top:12px">
       <summary>Tablo olarak göster</summary>
       <div class="table-wrap">
@@ -149,8 +126,8 @@
     <form class="export-form" method="get" action="/rapor/excel">
       <div class="field"><label for="d-bas">Başlangıç</label><input id="d-bas" type="date" name="bas" value="{{ rep.start.isoformat() }}" required></div>
       <div class="field"><label for="d-bit">Bitiş</label><input id="d-bit" type="date" name="bit" value="{{ rep.end.isoformat() }}" required></div>
-      <button class="btn btn-primary" type="submit">{{ icon("indir") }}Excel indir</button>
-      <button class="btn" type="submit" formaction="/rapor/csv">{{ icon("indir") }}CSV indir</button>
+      <button class="btn btn-primary" type="submit">{{ ikon("indir") }}Excel indir</button>
+      <button class="btn" type="submit" formaction="/rapor/csv">{{ ikon("indir") }}CSV indir</button>
     </form>
   </section>
 </div>

@@ -17,6 +17,7 @@ class CategoryRow:
     amount: int
     count: int
     pct: float  # toplam içindeki pay, 0-100
+    icon: str = "etiket"
 
 
 @dataclass
@@ -79,6 +80,7 @@ def _categories(db: Session, kind: str, start: date, end: date, total: int) -> l
             func.coalesce(Category.name, "Kategorisiz"),
             func.sum(Transaction.amount),
             func.count(Transaction.id),
+            func.coalesce(Category.icon, "etiket"),
         )
         .select_from(Transaction)
         .outerjoin(Category, Category.id == Transaction.category_id)
@@ -87,8 +89,8 @@ def _categories(db: Session, kind: str, start: date, end: date, total: int) -> l
         .order_by(func.sum(Transaction.amount).desc())
     ).all()
     return [
-        CategoryRow(name, amount, count, (amount / total * 100) if total else 0.0)
-        for name, amount, count in rows
+        CategoryRow(name, amount, count, (amount / total * 100) if total else 0.0, icon)
+        for name, amount, count, icon in rows
     ]
 
 
@@ -186,6 +188,47 @@ def trend(db: Session, end_year: int, end_month: int, months: int = 12) -> list[
         key = f"{y}-{m:02d}"
         out.append(TrendPoint(y, m, sums.get((key, GELIR), 0), sums.get((key, GIDER), 0)))
     return out
+
+
+@dataclass
+class DayPoint:
+    day: date
+    income: int = 0
+    expense: int = 0
+
+    @property
+    def net(self) -> int:
+        return self.income - self.expense
+
+
+def daily_series(db: Session, end: date, days: int = 14) -> list[DayPoint]:
+    """Son `days` günün gün gün gelir ve gideri (kayıt olmayan günler sıfır)."""
+    from datetime import timedelta
+
+    start = end - timedelta(days=days - 1)
+    points = {start + timedelta(days=i): DayPoint(start + timedelta(days=i)) for i in range(days)}
+    for day, kind, total in db.execute(
+        select(Transaction.day, Transaction.kind, func.sum(Transaction.amount))
+        .where(Transaction.day.between(start, end))
+        .group_by(Transaction.day, Transaction.kind)
+    ):
+        if kind == GELIR:
+            points[day].income = total
+        else:
+            points[day].expense = total
+    return list(points.values())
+
+
+def top_categories(rows: list[CategoryRow], limit: int = 5) -> list[CategoryRow]:
+    """En büyük `limit` kategori; kalanlar tek "Diğer kategoriler" satırında toplanır."""
+    if len(rows) <= limit + 1:
+        return rows
+    head, tail = rows[:limit], rows[limit:]
+    rest = CategoryRow(
+        f"Diğer {len(tail)} kategori", sum(c.amount for c in tail), sum(c.count for c in tail),
+        sum(c.pct for c in tail), "diger",
+    )
+    return head + [rest]
 
 
 def nice_ceiling(value: int) -> int:

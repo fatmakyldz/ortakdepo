@@ -1,117 +1,151 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon, tx_row, pay_form %}
+{% from "_macros.html" import tx_row, pay_form, due_pill, column_chart, cat_icon %}
+{% set hide_fab = true %}
 {% block title %}Bugün · {{ app_name }}{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1>{{ today|tarih }}, {{ today|gun_adi }}</h1>
-    <p>Merhaba {{ user.name }}. Bugün ne harcandı, ne geldi?</p>
+    <h1>Merhaba {{ user.name }}</h1>
+    <p>{{ today|tarih }}, {{ today|gun_adi }}</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-gider" href="/kayitlar/yeni?tur=gider">{{ ikon("eksi") }}Gider ekle</a>
+    <a class="btn btn-gelir" href="/kayitlar/yeni?tur=gelir">{{ ikon("arti") }}Gelir ekle</a>
   </div>
 </div>
 
 {% if alerts %}
-<ul class="alerts" aria-label="Ödeme uyarıları">
-  {% for item in alerts %}
-  <li class="{{ item.state }}">
-    <div class="alert-row">
-      <b>{{ item.installment.fixed.name }}</b>
-      <span class="num">{{ item.installment.amount|tl }}</span>
-      <span class="when">{{ item.when_text }}, vade {{ item.installment.due_date|tarih }}</span>
-    </div>
-    {{ pay_form(item, partners, user, today, "/") }}
-  </li>
-  {% endfor %}
-</ul>
-{% endif %}
-
-<div class="dash-grid">
-  <div class="stack">
-    <div class="quick">
-      <a class="btn btn-gider" href="/kayitlar/yeni?tur=gider">{{ icon("eksi") }}Gider ekle</a>
-      <a class="btn btn-gelir" href="/kayitlar/yeni?tur=gelir">{{ icon("arti") }}Gelir ekle</a>
-    </div>
-
-    <div class="receipt-wrap">
-      <section class="receipt" aria-labelledby="bugun-baslik">
-        <div class="receipt-head">
-          <h2 id="bugun-baslik">Günün fişi</h2>
-          <p>{{ today|tarih }}</p>
-        </div>
-        {% if todays %}
-        <ul class="receipt-lines">
-          {% for tx in todays %}
-          <li>
-            <a class="receipt-line" href="/kayitlar/{{ tx.id }}">
-              <span class="what"><b>{{ tx.category.name if tx.category else "Kategorisiz" }}</b>
-                <small>{{ tx.partner.name if tx.partner else "Ortak hesap" }}{% if tx.description %}, {{ tx.description }}{% endif %}{% if tx.kind == "gider" and not tx.receipts %}, fiş yok{% endif %}</small></span>
-              <span class="dots" aria-hidden="true"></span>
-              <span class="num {{ tx.kind }}">{{ "+" if tx.kind == "gelir" else "−" }}{{ tx.amount|sayi }}</span>
-            </a>
-          </li>
-          {% endfor %}
-        </ul>
-        <div class="receipt-total">
-          <div><span>Gelir</span><span class="num">{{ today_income|tl }}</span></div>
-          <div><span>Gider</span><span class="num">{{ today_expense|tl }}</span></div>
-          <div class="net"><span>Günün neti</span><span class="num">{{ (today_income - today_expense)|tl }}</span></div>
-        </div>
-        {% else %}
-        <p class="receipt-empty">Bugün için kayıt yok.<br>İlk gideri ya da geliri yukarıdan ekleyin.</p>
-        {% endif %}
-      </section>
-    </div>
-  </div>
-
-  <div class="stack">
-    <section class="card" aria-labelledby="ay-baslik">
-      <div class="card-head">
-        <h2 id="ay-baslik">{{ month_label }}</h2>
-        <a href="/rapor">Raporu aç</a>
-      </div>
-      <dl class="statement">
-        <div><dt>Gelir</dt><dd>{{ month.income|tl }}</dd></div>
-        <div><dt>Gider</dt><dd>{{ month.expense|tl }}</dd></div>
-        <div class="total"><dt>Net</dt><dd class="{{ 'gider' if month.net < 0 else '' }}">{{ month.net|tl }}</dd></div>
-        {% if month.unpaid_fixed %}
-        <div><dt>Bu ay ödenecek sabit giderler ({{ month.unpaid_fixed_count }})</dt><dd>−{{ month.unpaid_fixed|tl }}</dd></div>
-        <div class="after"><dt>Onlar da ödenince</dt><dd class="{{ 'gider' if month.net_after_fixed < 0 else '' }}">{{ month.net_after_fixed|tl }}</dd></div>
-        {% endif %}
-      </dl>
-    </section>
-
-    <section class="card" aria-labelledby="ortak-baslik">
-      <div class="card-head">
-        <h2 id="ortak-baslik">Ortak hesabı</h2>
-        <a href="/ortaklar">Dökümü gör</a>
-      </div>
-      {% if sheet.transfers %}
-        {% for t in sheet.transfers %}
-        <p class="owe"><b>{{ t.from_user.name }}</b>, <b>{{ t.to_user.name }}</b> ortağına <span class="num">{{ t.amount|tl }}</span> borçlu.</p>
-        {% endfor %}
-      {% else %}
-        <p class="owe">Hesap denk. Kimsenin kimseye borcu yok.</p>
-      {% endif %}
-    </section>
-  </div>
-</div>
-
-{% if recent_groups %}
-<section style="margin-top: 32px" aria-labelledby="son-baslik">
+<section class="card due-card" aria-labelledby="uyari-baslik" style="margin-bottom:16px">
   <div class="card-head">
-    <h2 id="son-baslik">Önceki günler</h2>
-    <a href="/kayitlar">Tüm kayıtlar</a>
+    <h2 id="uyari-baslik">Ödeme günü gelenler</h2>
+    <a href="/sabit">Tüm sabit giderler</a>
   </div>
-  <div class="card">
-    {% for g in recent_groups %}
-    <div class="day-group">
-      <div class="day-head">
-        <h3>{{ g.day|tarih }} <span>{{ g.day|gun_adi }}</span></h3>
-        <span class="num">{{ (g.income - g.expense)|tl }}</span>
+  <ul>
+    {% for item in alerts %}
+    <li>
+      <div class="due-row">
+        <b>{{ item.installment.fixed.name }}</b>
+        <span class="num">{{ item.installment.amount|tl }}</span>
+        <span class="when">{{ due_pill(item) }}<span>Vade {{ item.installment.due_date|tarih }}</span></span>
       </div>
-      <ul class="tx-list">{% for tx in g.items %}<li>{{ tx_row(tx) }}</li>{% endfor %}</ul>
-    </div>
+      {{ pay_form(item, partners, user, today, "/") }}
+    </li>
     {% endfor %}
-  </div>
+  </ul>
 </section>
 {% endif %}
+
+<div class="kpis">
+  <section class="hero" aria-labelledby="net-baslik">
+    <h2 class="hero-label" id="net-baslik">{{ month_label }} net</h2>
+    <p class="hero-value num">{{ month.net|tl }}</p>
+    {% if month.unpaid_fixed %}
+    <p class="hero-note">Bu ay ödenecek {{ month.unpaid_fixed_count }} sabit gider var: <b>{{ month.unpaid_fixed|tl }}</b>. Onlar da ödenince <b>{{ month.net_after_fixed|tl }}</b> kalır.</p>
+    {% elif month.count %}
+    <p class="hero-note">Bu ay {{ month.count }} kayıt girildi.</p>
+    {% else %}
+    <p class="hero-note">Bu ay için kayıt yok. İlk gideri ya da geliri ekleyin.</p>
+    {% endif %}
+  </section>
+  <section class="card tile" aria-labelledby="gelir-baslik">
+    <h2 class="tile-label" id="gelir-baslik"><i class="dot dot-gelir"></i>Bu ay gelir</h2>
+    <p class="tile-value num">{{ month.income|tl }}</p>
+    <p class="tile-note">{{ prev_label }} ayında <span class="num">{{ prev_income|tl }}</span></p>
+  </section>
+  <section class="card tile" aria-labelledby="gider-baslik">
+    <h2 class="tile-label" id="gider-baslik"><i class="dot dot-gider"></i>Bu ay gider</h2>
+    <p class="tile-value num">{{ month.expense|tl }}</p>
+    <p class="tile-note">{{ prev_label }} ayında <span class="num">{{ prev_expense|tl }}</span></p>
+  </section>
+</div>
+
+<div class="dash-grid even">
+  <section class="card" aria-labelledby="seyir-baslik">
+    <div class="card-head">
+      <h2 id="seyir-baslik">Son {{ days }} gün</h2>
+      <a href="/rapor">Raporu aç</a>
+    </div>
+    {% if chart.empty %}
+    <p class="muted">Kayıt girdikçe günlük gelir ve gider burada yan yana görünür.</p>
+    {% else %}
+    {{ column_chart(chart, "Son " ~ days ~ " günün günlük gelir ve gider sütun grafiği. Değerler aşağıdaki tabloda da var.", compact=true) }}
+    <details class="disclose" style="margin-top:12px">
+      <summary>Tablo olarak göster</summary>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Gün</th><th class="num">Gelir</th><th class="num">Gider</th><th class="num">Net</th></tr></thead>
+          <tbody>
+            {% for p in series|reverse %}
+            <tr><th scope="row">{{ p.day|tarih_kisa }} <span class="muted">{{ p.day|gun_adi }}</span></th><td class="num">{{ p.income|tl }}</td><td class="num">{{ p.expense|tl }}</td><td class="num">{{ p.net|tl }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+    {% endif %}
+  </section>
+
+  <section class="card" aria-labelledby="dagilim-baslik">
+    <div class="card-head">
+      <h2 id="dagilim-baslik">Bu ay gider nereye gitti?</h2>
+    </div>
+    {% if top_cats %}
+    <ul class="cat-bars">
+      {% for c in top_cats %}
+      <li>
+        <span class="cat-ic is-small" aria-hidden="true">{{ ikon(c.icon) }}</span>
+        <span class="name">{{ c.name }}<small>%{{ "%.0f"|format(c.pct) }}, {{ c.count }} kayıt</small></span>
+        <span class="num">{{ c.amount|tl }}</span>
+        <div class="track" aria-hidden="true"><div class="fill" style="width: {{ '%.2f'|format(c.amount / max_cat * 100) }}%"></div></div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">Bu ay için gider kaydı yok.</p>
+    {% endif %}
+  </section>
+</div>
+
+<div class="dash-grid">
+  <section class="card" aria-labelledby="bugun-baslik">
+    <div class="card-head">
+      <h2 id="bugun-baslik">Bugün</h2>
+      {% if todays %}<span class="sub num">Gelir {{ today_income|tl }}, gider {{ today_expense|tl }}</span>{% endif %}
+    </div>
+    {% if todays %}
+    <ul class="tx-list">{% for tx in todays %}<li>{{ tx_row(tx) }}</li>{% endfor %}</ul>
+    {% else %}
+    <p class="muted">Bugün için kayıt yok.</p>
+    {% endif %}
+
+    {% if recent_groups %}
+    <div style="margin-top:22px">
+      {% for g in recent_groups %}
+      <div class="day-group">
+        <div class="day-head">
+          <h3>{{ g.day|tarih }} <span>{{ g.day|gun_adi }}</span></h3>
+          <span class="num">{{ (g.income - g.expense)|tl }}</span>
+        </div>
+        <ul class="tx-list">{% for tx in g.items %}<li>{{ tx_row(tx) }}</li>{% endfor %}</ul>
+      </div>
+      {% endfor %}
+    </div>
+    <p style="margin-top:14px"><a href="/kayitlar">Tüm kayıtlar</a></p>
+    {% endif %}
+  </section>
+
+  <section class="card" aria-labelledby="ortak-baslik">
+    <div class="card-head">
+      <h2 id="ortak-baslik">Ortak hesabı</h2>
+      <a href="/ortaklar">Dökümü gör</a>
+    </div>
+    {% if sheet.transfers %}
+      {% for t in sheet.transfers %}
+      <p class="owe"><b>{{ t.from_user.name }}</b>, <b>{{ t.to_user.name }}</b> ortağına <span class="num">{{ t.amount|tl }}</span> borçlu.</p>
+      {% endfor %}
+    {% else %}
+      <p class="owe">Hesap denk. Kimsenin kimseye borcu yok.</p>
+    {% endif %}
+  </section>
+</div>
 {% endblock %}

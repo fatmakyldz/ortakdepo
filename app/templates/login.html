@@ -3,10 +3,13 @@
 {% block body %}
 <main class="auth">
   <div class="auth-box">
-    <span class="brand">{{ app_name }}</span>
-    <p>Günlük gelir, gider ve fişler tek defterde.</p>
+    <div class="auth-brand">
+      <img class="on-light" src="/static/brand/sezkar-logo-acik-zemin.png" width="1248" height="267" alt="Sezkar">
+      <img class="on-dark" src="/static/brand/sezkar-logo-koyu-zemin.png" width="1248" height="267" alt="Sezkar">
+      <span>MUHASEBE</span>
+    </div>
     <div class="card">
-      {% if flashes %}<div class="flash" role="status">{% for f in flashes %}<p class="{{ f.kind }}">{{ f.text }}</p>{% endfor %}</div>{% endif %}
+      {% if flashes %}<div class="flash" role="status">{% for f in flashes %}<p class="{{ f.kind }}"><span>{{ f.text }}</span></p>{% endfor %}</div>{% endif %}
       {% if error %}<ul class="errors" role="alert"><li>{{ error }}</li></ul>{% endif %}
       <form class="form" method="post" action="/giris">
         <div class="field">
