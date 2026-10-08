@@ -7,7 +7,7 @@
 - **Sabit giderler:** leasing, kira gibi aylık ödemeler. Taksitler her ay kendiliğinden açılır; günü yaklaşınca sayfada uyarı ve e-posta gelir.
 - **Ortak hesabı:** kim cebinden ne ödedi, kim ne aldı, sonuçta kim kime ne kadar borçlu.
 - **Rapor:** aylık kâr/zarar, giderin kategorilere dağılımı, son 12 ayın seyri, gün gün döküm.
-- **Döküm:** muhasebeci için Excel (çok sayfalı) ve CSV.
+- **Döküm:** muhasebeci için PDF ve Excel (çok sayfalı).
 
 Teknik: Python 3.11+, FastAPI, SQLAlchemy, SQLite, Jinja2 şablonları. Ayrı bir ön yüz derlemesi ya da dış servis yok; tek süreç, tek veri klasörü.
 

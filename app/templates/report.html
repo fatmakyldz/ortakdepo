@@ -145,12 +145,12 @@
 
   <section class="card export-card" aria-labelledby="dokum-baslik">
     <h2 id="dokum-baslik">Döküm indir</h2>
-    <p class="hint" style="margin-bottom:12px">Muhasebeciye vermek için. Excel dosyasında özet, giderler, gelirler, sabit ödemeler ve ortaklar arası ödemeler ayrı sayfalardadır.</p>
+    <p class="hint" style="margin-bottom:12px">Muhasebeciye vermek için. PDF tek dosyada özet ve kayıt listesi; Excel'de özet, giderler, gelirler, sabit ödemeler ve ortak ödemeleri ayrı sayfalardadır.</p>
     <form class="export-form" method="get" action="/rapor/excel">
       <div class="field"><label for="d-bas">Başlangıç</label><input id="d-bas" type="date" name="bas" value="{{ rep.start.isoformat() }}" required></div>
       <div class="field"><label for="d-bit">Bitiş</label><input id="d-bit" type="date" name="bit" value="{{ rep.end.isoformat() }}" required></div>
-      <button class="btn btn-primary" type="submit">{{ icon("indir") }}Excel indir</button>
-      <button class="btn" type="submit" formaction="/rapor/csv">{{ icon("indir") }}CSV indir</button>
+      <button class="btn btn-primary" type="submit" formaction="/rapor/pdf">{{ icon("indir") }}PDF indir</button>
+      <button class="btn" type="submit">{{ icon("indir") }}Excel indir</button>
     </form>
   </section>
 </div>

@@ -213,11 +213,9 @@ def test_report_and_exports(logged_in, db):
     # kullanıcı metni formül olarak çalışmamalı
     assert wb["Giderler"]["C2"].data_type == "s"
 
-    r = c.get(f"/rapor/csv?bas={start}&bit={end}")
-    text = r.content.decode("utf-8-sig")
-    lines = text.strip().split("\r\n")
-    assert lines[0].startswith("Tarih;Tür;Kategori") and len(lines) == 4
-    assert "1200,50" in text and "'=HYPERLINK" in text
+    r = c.get(f"/rapor/pdf?bas={start}&bit={end}")
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
+    assert r.content[:5] == b"%PDF-" and len(r.content) > 2000
 
 
 def test_category_management(logged_in, db):

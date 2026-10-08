@@ -130,8 +130,8 @@ def export_xlsx(
     )
 
 
-@router.get("/rapor/csv")
-def export_csv(
+@router.get("/rapor/pdf")
+def export_pdf(
     request: Request, bas: str = "", bit: str = "",
     db: Session = Depends(get_db), user: User = Depends(current_user),
 ):
@@ -140,7 +140,7 @@ def export_csv(
         return redirect("/rapor")
     start, end = rng
     return _download(
-        exports.build_csv(db, start, end),
-        f"defter_{start.isoformat()}_{end.isoformat()}.csv",
-        "text/csv; charset=utf-8",
+        exports.build_pdf(db, start, end),
+        f"defter_{start.isoformat()}_{end.isoformat()}.pdf",
+        "application/pdf",
     )

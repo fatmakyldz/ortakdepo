@@ -271,6 +271,7 @@ input[type="checkbox"] { accent-color: var(--brand); }
 .chip input:checked + span { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: 0 4px 12px rgb(79 70 229 / 0.28); }
 .chip input:focus-visible + span { outline: 3px solid var(--brand-wash-2); outline-offset: 2px; }
 
+input[type="date"], input[type="month"] { min-width: 0; max-width: 100%; -webkit-appearance: none; appearance: none; display: block; }
 .date-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .amount-row { display: grid; grid-template-columns: minmax(0, 1fr) 118px; gap: 8px; }
 .theme-btn { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface); color: var(--ink-2); cursor: pointer; box-shadow: var(--shadow-s); }
@@ -522,6 +523,10 @@ dialog.lightbox .lb-bar a:hover, dialog.lightbox .lb-bar button:hover { backgrou
 .report-grid { display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 820px) { .report-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }
 .export-form { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); align-items: end; }
+@media (max-width: 560px) {
+  .export-form { grid-template-columns: 1fr 1fr; }
+  .export-form .btn { grid-column: 1 / -1; }
+}
 
 .auth {
   min-height: 100dvh; display: grid; place-items: center; padding: 28px var(--side);

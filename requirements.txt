@@ -5,6 +5,7 @@ Jinja2>=3.1
 python-multipart>=0.0.9
 itsdangerous>=2.2
 openpyxl>=3.1
+fpdf2>=2.7
 pillow>=10.4
 pillow-heif>=0.18
 python-dotenv>=1.0

@@ -1,10 +1,13 @@
-"""Muhasebeciye verilecek döküm: Excel (çok sayfalı) ve CSV."""
+"""Muhasebeciye verilecek döküm: Excel (çok sayfalı) ve PDF."""
 from __future__ import annotations
 
-import csv
 import io
 from datetime import date
+from pathlib import Path
 
+from fpdf import FPDF
+from fpdf.enums import TableBordersLayout
+from fpdf.fonts import FontFace
 from openpyxl import Workbook
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -15,7 +18,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..models import GELIR, GIDER, PAYMENT_LABELS, FixedExpense, Installment, PartnerPayment, Transaction
 from ..timeutil import fmt_date
-from ..money import TRY, format_money
+from ..money import TRY, format_money, format_try
 from . import balance, rates, reports
 
 TL = '#,##0.00 "₺"'
@@ -24,12 +27,6 @@ HEAD_FILL = PatternFill("solid", start_color="16233B")
 HEAD_FONT = Font(bold=True, color="FFFFFF")
 BOLD = Font(bold=True)
 THIN = Side(style="thin", color="D9DEE3")
-
-
-def _safe(text: str | None) -> str:
-    """CSV için: hücrenin formül olarak çalışmasını engeller (=, +, -, @ ile başlayanlar)."""
-    text = text or ""
-    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
 
 
 def _defuse_formulas(wb: Workbook) -> None:
@@ -212,20 +209,143 @@ def build_xlsx(db: Session, start: date, end: date) -> bytes:
     return buf.getvalue()
 
 
-def build_csv(db: Session, start: date, end: date) -> bytes:
-    """Türkçe Excel'in doğrudan açabildiği biçim: noktalı virgül ayraç, UTF-8 BOM."""
-    buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";", lineterminator="\r\n")
-    w.writerow(["Tarih", "Tür", "Kategori", "Açıklama", "Ödeyen / teslim alan", "Tutar", "Fiş sayısı", "Kayıt no"])
-    for tx in _transactions(db, start, end):
-        w.writerow([
-            tx.day.strftime("%d.%m.%Y"),
-            "Gelir" if tx.kind == GELIR else "Gider",
-            _safe(tx.category.name if tx.category else "Kategorisiz"),
-            _safe(tx.description),
-            _safe(tx.partner.name if tx.partner else "Ortak hesap"),
-            f"{tx.amount / 100:.2f}".replace(".", ","),
-            len(tx.receipts),
-            tx.id,
-        ])
-    return ("﻿" + buf.getvalue()).encode("utf-8")
+FONT_DIR = Path(__file__).resolve().parent.parent / "static" / "fonts"
+PDF_INK = (20, 26, 46)
+PDF_MUTED = (108, 115, 137)
+PDF_HEAD = FontFace(emphasis="BOLD", color=(255, 255, 255), fill_color=(20, 26, 46))
+PDF_TOTAL = FontFace(emphasis="BOLD")
+
+
+class _Pdf(FPDF):
+    def footer(self) -> None:
+        self.set_y(-12)
+        self.set_font("DejaVu", "", 8)
+        self.set_text_color(*PDF_MUTED)
+        self.cell(0, 6, f"{settings.app_name}  ·  Sayfa {self.page_no()}/{{nb}}", align="C")
+
+
+def _pdf_title(pdf: FPDF, text: str) -> None:
+    pdf.ln(5)
+    pdf.set_font("DejaVu", "B", 12)
+    pdf.set_text_color(*PDF_INK)
+    pdf.cell(0, 8, text, new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(1)
+
+
+def _pdf_table(pdf: FPDF, headings: list[str], rows: list[list[str]], widths: tuple[int, ...],
+               align: tuple[str, ...], total: list[str] | None = None) -> None:
+    pdf.set_font("DejaVu", "", 9)
+    with pdf.table(
+        col_widths=widths, text_align=align, headings_style=PDF_HEAD,
+        borders_layout=TableBordersLayout.HORIZONTAL_LINES, line_height=6, padding=1.2,
+    ) as table:
+        head = table.row()
+        for h in headings:
+            head.cell(h)
+        for r in rows:
+            row = table.row()
+            for v in r:
+                row.cell(v)
+        if total:
+            row = table.row(style=PDF_TOTAL)
+            for v in total:
+                row.cell(v)
+
+
+def _tx_rows(rows: list[Transaction]) -> list[list[str]]:
+    return [[
+        tx.day.strftime("%d.%m.%Y"),
+        tx.category.name if tx.category else "Kategorisiz",
+        tx.description or "",
+        tx.partner.name if tx.partner else "Ortak hesap",
+        format_try(tx.amount),
+    ] for tx in rows]
+
+
+def build_pdf(db: Session, start: date, end: date) -> bytes:
+    rep = reports.period_report(db, start, end)
+    expenses = _transactions(db, start, end, GIDER)
+    incomes = _transactions(db, start, end, GELIR)
+
+    pdf = _Pdf(orientation="P", unit="mm", format="A4")
+    pdf.add_font("DejaVu", "", str(FONT_DIR / "DejaVuSans.ttf"))
+    pdf.add_font("DejaVu", "B", str(FONT_DIR / "DejaVuSans-Bold.ttf"))
+    pdf.set_margins(15, 15, 15)
+    pdf.set_auto_page_break(auto=True, margin=18)
+    pdf.alias_nb_pages()
+    pdf.add_page()
+
+    pdf.set_font("DejaVu", "B", 18)
+    pdf.set_text_color(*PDF_INK)
+    pdf.cell(0, 10, settings.app_name, new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("DejaVu", "", 10)
+    pdf.set_text_color(*PDF_MUTED)
+    pdf.cell(0, 6, f"Gelir-gider dökümü, {fmt_date(start)} – {fmt_date(end)}", new_x="LMARGIN", new_y="NEXT")
+
+    _pdf_title(pdf, "Özet")
+    summary = [
+        ["Toplam gelir", format_try(rep.income)],
+        ["Toplam gider", format_try(rep.expense)],
+        ["Net (gelir − gider)", format_try(rep.net)],
+    ]
+    if rep.unpaid_fixed:
+        summary.append([f"Dönemde vadesi gelen, ödenmemiş sabit giderler ({rep.unpaid_fixed_count})", format_try(rep.unpaid_fixed)])
+        summary.append(["Onlar da ödenince kalan", format_try(rep.net_after_fixed)])
+    _pdf_table(pdf, ["Kalem", "Tutar"], summary, (130, 50), ("LEFT", "RIGHT"))
+
+    if rep.expense_categories:
+        _pdf_title(pdf, "Gider nereye gitti?")
+        _pdf_table(
+            pdf, ["Kategori", "Kayıt", "Pay", "Tutar"],
+            [[c.name, str(c.count), f"%{c.pct:.0f}", format_try(c.amount)] for c in rep.expense_categories],
+            (90, 25, 25, 40), ("LEFT", "RIGHT", "RIGHT", "RIGHT"),
+        )
+    if rep.income_categories:
+        _pdf_title(pdf, "Gelir nereden geldi?")
+        _pdf_table(
+            pdf, ["Kategori", "Kayıt", "Pay", "Tutar"],
+            [[c.name, str(c.count), f"%{c.pct:.0f}", format_try(c.amount)] for c in rep.income_categories],
+            (90, 25, 25, 40), ("LEFT", "RIGHT", "RIGHT", "RIGHT"),
+        )
+    if rep.partners:
+        _pdf_title(pdf, "Kim ödedi, kim aldı?")
+        _pdf_table(
+            pdf, ["Ortak", "Ödediği gider", "Aldığı gelir"],
+            [[p.name, format_try(p.paid), format_try(p.collected)] for p in rep.partners],
+            (90, 45, 45), ("LEFT", "RIGHT", "RIGHT"),
+        )
+
+    sheet = balance.compute(db)
+    _pdf_title(pdf, "Ortakların şirketle hesabı (bugüne kadar)")
+    _pdf_table(
+        pdf, ["Ortak", "Durum", "Tutar"],
+        [[l.user.name,
+          "Şirketten alacaklı" if l.balance > 0 else "Şirkete borçlu" if l.balance < 0 else "Denk",
+          format_try(abs(l.balance))] for l in sheet.lines],
+        (90, 50, 40), ("LEFT", "LEFT", "RIGHT"),
+    )
+
+    _pdf_title(pdf, f"Giderler ({len(expenses)} kayıt)")
+    _pdf_table(
+        pdf, ["Tarih", "Kategori", "Açıklama", "Ödeyen", "Tutar"], _tx_rows(expenses),
+        (22, 34, 66, 30, 28), ("LEFT", "LEFT", "LEFT", "LEFT", "RIGHT"),
+        total=["Toplam", "", "", "", format_try(rep.expense)],
+    )
+    _pdf_title(pdf, f"Gelirler ({len(incomes)} kayıt)")
+    _pdf_table(
+        pdf, ["Tarih", "Kategori", "Açıklama", "Teslim alan", "Tutar"], _tx_rows(incomes),
+        (22, 34, 66, 30, 28), ("LEFT", "LEFT", "LEFT", "LEFT", "RIGHT"),
+        total=["Toplam", "", "", "", format_try(rep.income)],
+    )
+
+    pays = db.scalars(
+        select(PartnerPayment).where(PartnerPayment.day.between(start, end)).order_by(PartnerPayment.day)
+    ).all()
+    if pays:
+        _pdf_title(pdf, "Şirket ile ortaklar arasındaki ödemeler")
+        _pdf_table(
+            pdf, ["Tarih", "Ortak", "İşlem", "Not", "Tutar"],
+            [[p.day.strftime("%d.%m.%Y"), p.user.name, PAYMENT_LABELS.get(p.direction, p.direction), p.note or "", format_try(p.amount)] for p in pays],
+            (22, 34, 44, 52, 28), ("LEFT", "LEFT", "LEFT", "LEFT", "RIGHT"),
+        )
+    return bytes(pdf.output())

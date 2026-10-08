@@ -189,6 +189,8 @@
     document.querySelectorAll("[data-theme-set]").forEach(function (b) {
       b.setAttribute("aria-pressed", b.getAttribute("data-theme-set") === choice ? "true" : "false");
     });
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", effectiveTheme() === "dark" ? "#171b2d" : "#ffffff");
   }
   function applyTheme(choice) {
     if (choice === "light" || choice === "dark") root.setAttribute("data-theme", choice);
