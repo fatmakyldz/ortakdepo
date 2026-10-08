@@ -14,8 +14,10 @@
 <link rel="preload" href="/static/fonts/archivo-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/css/app.css?v={{ asset_v }}">
 <link rel="manifest" href="/manifest.webmanifest">
-<link rel="icon" href="/static/brand/favicon.png" type="image/png">
-<link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png">
+{# Sekme simgesi sezkar.com ile aynı dosyalar: açık temada siyah K, koyu temada beyaz K #}
+<link rel="icon" href="/static/brand/icon-acik-tema.png" type="image/png" sizes="96x96" media="(prefers-color-scheme: light)">
+<link rel="icon" href="/static/brand/icon-koyu-tema.png" type="image/png" sizes="96x96" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png" sizes="180x180">
 </head>
 <body>
 {% block body %}

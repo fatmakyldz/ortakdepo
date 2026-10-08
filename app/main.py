@@ -115,6 +115,15 @@ def service_worker():
     )
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    # Tarayıcıların kendiliğinden istediği adres; sezkar.com'daki dosyanın aynısı
+    return FileResponse(
+        APP_DIR / "static" / "brand" / "favicon.ico", media_type="image/x-icon",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @app.get("/cevrimdisi", include_in_schema=False)
 def offline(request: Request):
     return render(request, "offline.html")

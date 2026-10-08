@@ -361,7 +361,8 @@ def test_install_files_are_public_and_valid(client, db):
     assert sw.status_code == 200 and "javascript" in sw.headers["content-type"] and "/cevrimdisi" in sw.text
     off = client.get("/cevrimdisi")
     assert off.status_code == 200 and "Bağlantı yok" in off.text
-    for path in ["/static/brand/apple-touch-icon.png", "/static/brand/favicon.png", "/static/js/theme.js",
+    for path in ["/static/brand/apple-touch-icon.png", "/static/brand/icon-acik-tema.png",
+                 "/static/brand/icon-koyu-tema.png", "/favicon.ico", "/static/js/theme.js",
                  "/static/fonts/archivo-latin-wdth-normal.woff2", "/static/fonts/archivo-latin-ext-wdth-normal.woff2"]:
         assert client.get(path).status_code == 200, path
 
