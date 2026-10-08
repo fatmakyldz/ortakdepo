@@ -90,6 +90,9 @@ def _base_url() -> str:
     railway = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip()
     if railway:
         return f"https://{railway}".rstrip("/")
+    fly = os.environ.get("FLY_APP_NAME", "").strip()
+    if fly:
+        return f"https://{fly}.fly.dev"
     return "http://localhost:8000"
 
 

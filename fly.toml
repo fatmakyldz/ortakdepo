@@ -1,0 +1,43 @@
+# Fly.io kurulum tarifi. Kullanımı README.md > "Buluta kurmak" bölümünde.
+# En küçük makine + 1 GB disk: iki kişilik kullanım için yeterli, aylık yaklaşık 2 $.
+
+app = "sezkar-muhasebe"        # dünya genelinde benzersiz olmalı; doluysa `fly launch` başka ad sorar
+primary_region = "ams"         # Amsterdam. Fiyat bölgeye göre değişir; Frankfurt ("fra") biraz daha pahalı
+
+# Büyük bir fiş fotoğrafı işlenirken bellek yetmezse süreç ölmesin diye takas alanı
+swap_size_mb = 512
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  DATA_DIR = "/data"
+  HTTPS_ONLY = "1"
+  TZ_NAME = "Europe/Istanbul"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"   # sürekli açık: ödeme hatırlatmaları uygulamanın içinden gider
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    path = "/saglik"
+    method = "GET"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+
+[mounts]
+  source = "veri"              # veritabanı ve fişler
+  destination = "/data"
+  initial_size = "1gb"
+  auto_extend_size_threshold = 80     # %80 dolunca
+  auto_extend_size_increment = "1GB"  # 1 GB büyüt
+  auto_extend_size_limit = "5GB"      # en çok 5 GB'a kadar
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"             # ölçülen en yüksek kullanım ~170 MB; yetmezse "512mb" yapın (+~1,3 $)

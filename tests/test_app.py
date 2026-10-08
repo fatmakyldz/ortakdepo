@@ -450,3 +450,28 @@ def test_daily_series_and_top_categories(db):
     assert len(top) == 6 and top[-1].name == "Diğer 4 kategori"
     assert sum(r.amount for r in top) == sum(r.amount for r in rows)
     assert reports.top_categories(rows[:6], 5) == rows[:6]   # tek satır için "Diğer" açılmaz
+
+
+def test_large_jpeg_is_downscaled_with_correct_shape_and_orientation(logged_in, db):
+    import numpy as np
+    c = logged_in
+    # 4032x3024 (telefon fotoğrafı ölçüsü), EXIF yönü 6: gösterimde dik durmalı
+    arr = np.zeros((3024, 4032, 3), dtype=np.uint8)
+    arr[:, :2016] = (220, 30, 30)            # sol yarı kırmızı
+    arr[:, 2016:] = (30, 30, 220)            # sağ yarı mavi
+    img = Image.fromarray(arr)
+    exif = img.getexif()
+    exif[0x0112] = 6
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=90, exif=exif)
+    r = c.post("/kayitlar/yeni", data={"tur": "gider", "gun": today().isoformat(), "tutar": "10",
+                                       "kategori_id": str(_cat(db, "Yemek")), "kim": "ortak"},
+               files=[("fisler", ("foto.jpg", buf.getvalue(), "image/jpeg"))])
+    assert r.status_code == 200
+    rec = db.query(Receipt).one()
+    out = Image.open(settings.upload_dir / rec.path)
+    assert out.size == (1500, 2000)                      # döndürülmüş, uzun kenar 2000
+    top, bottom = out.getpixel((750, 200)), out.getpixel((750, 1800))
+    assert top[0] > 150 and top[2] < 100                 # üstte kırmızı
+    assert bottom[2] > 150 and bottom[0] < 100           # altta mavi
+    assert not out.getexif().get(0x0112)                 # yön bilgisi artık gerekmiyor, EXIF atıldı

@@ -41,13 +41,37 @@ Ekim 2026'da servislerin kendi fiyat sayfalarından alınan rakamlar (değişebi
 
 | Servis | Aylık yaklaşık | Bölge | Not |
 |---|---|---|---|
-| **Render** (önerilen) | 7 $ (512 MB) + disk 0,25 $/GB → 2 GB ile ~7,5 $ | Frankfurt | Depodaki `render.yaml` ile kurulur. Diskin her gün otomatik yedeği alınır, en az 7 gün saklanır. Ücretsiz planı disk desteklemez ve 15 dakikada uyur; bu uygulamaya uymaz. |
-| Railway | 5 $ abonelik (5 $ kullanım dahil); RAM 10 $/GB, disk 0,15 $/GB | Amsterdam | Küçük kullanımda aylık 5 $ içinde kalması beklenir. Hobby planda disk en çok 5 GB. Kurulum elle yapılır (aşağıda). |
-| Fly.io | 3,19 $ (512 MB) + disk 0,15 $/GB | Frankfurt dahil | En ucuzu ama kurulum komut satırından; bu depoda hazır dosyası yok. |
+| **Fly.io** (en ucuz, önerilen) | ~2 $: en küçük makine (256 MB) ~2 $ + 1 GB disk 0,15 $ | Amsterdam, Frankfurt | Depodaki `fly.toml` ile kurulur. Kurulum ve güncelleme komut satırından (`fly deploy`). Ücretsiz planı yok, kart gerekir. |
+| Railway | 5 $ abonelik (5 $ kullanım dahil) | Amsterdam | Küçük kullanımda aylık 5 $ içinde kalması beklenir. Kurulum web arayüzünden, elle. |
+| Render (en kolay) | 7 $ (512 MB) + disk 0,25 $/GB → 2 GB ile ~7,5 $ | Frankfurt | Depodaki `render.yaml` ile birkaç tıkla kurulur, `main` dalına gönderilen değişiklik kendiliğinden yayına girer, disk her gün otomatik yedeklenir. |
 
-Kaynaklar: [Render fiyatları](https://render.com/pricing), [Render diskleri](https://render.com/docs/disks), [Render ücretsiz plan sınırları](https://render.com/docs/free), [Railway fiyatları](https://docs.railway.com/reference/pricing/plans), [Railway volume](https://docs.railway.com/reference/volumes), [Fly.io fiyatları](https://fly.io/docs/about/pricing/).
+İki kişilik kullanım için en küçük makine yeter: uygulama boşta ~100 MB, 12 megapiksellik fiş fotoğrafları işlenirken en çok ~170 MB bellek kullanıyor (ölçüldü). Başka zorunlu masraf yok: e-postalar mevcut şirket e-postasından gider, adres olarak servisin verdiği ücretsiz adres ya da `sezkar.com`'un bir alt alan adı kullanılabilir.
 
-### Render ile (önerilen)
+Bu uygulama için güvenilir bir **ücretsiz** seçenek yok: ücretsiz planlar ya kalıcı disk vermiyor ya da kullanılmayınca uyuyor.
+
+Kaynaklar: [Fly.io fiyatları](https://docs.fly.io/about/pricing), [Railway fiyatları](https://docs.railway.com/reference/pricing/plans), [Railway volume](https://docs.railway.com/reference/volumes), [Render fiyatları](https://render.com/pricing), [Render diskleri](https://render.com/docs/disks), [Render ücretsiz plan sınırları](https://render.com/docs/free).
+
+### Fly.io ile (en ucuz)
+
+Bilgisayarınızda [flyctl](https://fly.io/docs/flyctl/install/) kurulu olmalı.
+
+```bash
+fly auth signup                      # ya da: fly auth login
+fly launch --copy-config --no-deploy # depodaki fly.toml'u kullanır; ad doluysa başka ad sorar. Veritabanı önerilerini reddedin.
+fly secrets set KURULUM_ANAHTARI="buraya-uzun-bir-parola"
+fly deploy --ha=false                # tek makine; 1 GB'lık disk ilk kurulumda kendiliğinden oluşur
+```
+
+1. `https://<uygulama-adı>.fly.dev` adresini açın, kurulum anahtarını ve iki ortağın bilgilerini girin.
+2. E-posta hatırlatmaları için SMTP değerlerini de aynı yolla verin: `fly secrets set SMTP_HOST=smtp.gmail.com SMTP_USER=... SMTP_PASSWORD=... SMTP_FROM=...`
+3. Kendi alan adınız için: `fly certs add muhasebe.sezkar.com`, sonra alan adınızın DNS kayıtlarına ekranda yazan CNAME'i ekleyin.
+4. Güncelleme: depodaki yeni sürümü çekip yeniden `fly deploy --ha=false`.
+
+Yedek için ayda bir Rapor sayfasından Excel dökümü indirmenizi öneririm; Fly ayrıca disklerin anlık yedeğini alabiliyor ([volume snapshots](https://fly.io/docs/volumes/snapshots/); saklama süresine oradan bakın).
+
+> `fly.toml` Fly'ın belgelerindeki alan adlarına göre yazıldı ama Fly üzerinde çalıştırılarak denenmedi. Fiyat bölgeye göre değişiyor; yukarıdaki rakam en ucuz bölge fiyatından yaklaşık hesaptır, kesin tutarı Fly'ın fiyat sayfasındaki bölge seçicisinden görün.
+
+### Render ile (en kolay)
 
 1. [render.com](https://render.com) üzerinde hesap açın ve GitHub hesabınızı bağlayın.
 2. **New > Blueprint** deyip bu depoyu seçin. Render `render.yaml` dosyasını okur: Frankfurt'ta bir web servisi ve 2 GB disk oluşturur.
@@ -187,7 +211,7 @@ app/
   services/          hesap mantığı: balance, fixed, reports, charts, exports, reminders, receipts
   templates/, static/ (static/brand: logo ve simgeler)
 scripts/             baslat.py (kapsayıcı başlangıcı), ornek_veri.py, yedekle.sh, sifre_sifirla.py
-render.yaml          Render kurulum tarifi
+fly.toml, render.yaml Fly.io ve Render kurulum tarifleri
 tests/
 ```
 
