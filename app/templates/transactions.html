@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, tx_row, month_nav %}
+{% block title %}Kayıtlar · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Kayıtlar</h1>
+    {{ month_nav("/kayitlar", prev_ay, next_ay, month_label, is_current_month) }}
+  </div>
+  <div class="actions">
+    <a class="btn btn-gider" href="/kayitlar/yeni?tur=gider">{{ icon("eksi") }}Gider ekle</a>
+    <a class="btn btn-gelir" href="/kayitlar/yeni?tur=gelir">{{ icon("arti") }}Gelir ekle</a>
+  </div>
+</div>
+
+<form class="filters" method="get" action="/kayitlar">
+  <input type="hidden" name="ay" value="{{ ay }}">
+  <div class="field">
+    <label for="f-tur">Tür</label>
+    <select id="f-tur" name="tur">
+      <option value="">Gelir ve gider</option>
+      <option value="gider" {{ "selected" if filters.tur == "gider" }}>Yalnızca gider</option>
+      <option value="gelir" {{ "selected" if filters.tur == "gelir" }}>Yalnızca gelir</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="f-kat">Kategori</label>
+    <select id="f-kat" name="kategori">
+      <option value="">Tüm kategoriler</option>
+      {% for c in categories %}<option value="{{ c.id }}" {{ "selected" if filters.kategori == c.id|string }}>{{ c.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="f-kim">Kim</label>
+    <select id="f-kim" name="kim">
+      <option value="">Herkes</option>
+      {% for p in partners %}<option value="{{ p.id }}" {{ "selected" if filters.kim == p.id|string }}>{{ p.name }}</option>{% endfor %}
+      <option value="ortak" {{ "selected" if filters.kim == "ortak" }}>Ortak hesap</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="f-q">Açıklamada ara</label>
+    <input id="f-q" type="search" name="q" value="{{ filters.q }}">
+  </div>
+  <button class="btn btn-quiet" type="submit">Süz</button>
+</form>
+
+{% if groups %}
+<p class="totals-line">
+  <span>Gelir <b>{{ total_income|tl }}</b></span>
+  <span>Gider <b>{{ total_expense|tl }}</b></span>
+  <span>Net <b>{{ (total_income - total_expense)|tl }}</b></span>
+  <span>{{ count }} kayıt{% if has_filters %}, <a href="/kayitlar?ay={{ ay }}">süzgeci kaldır</a>{% endif %}</span>
+</p>
+<div class="card">
+  {% for g in groups %}
+  <div class="day-group">
+    <div class="day-head">
+      <h2>{{ g.day|tarih }} <span>{{ g.day|gun_adi }}</span></h2>
+      <span class="num">{{ (g.income - g.expense)|tl }}</span>
+    </div>
+    <ul class="tx-list">{% for tx in g.items %}<li>{{ tx_row(tx) }}</li>{% endfor %}</ul>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  {% if has_filters %}
+  <b>Bu süzgeçle eşleşen kayıt yok.</b>
+  Süzgeci değiştirin ya da <a href="/kayitlar?ay={{ ay }}">kaldırın</a>.
+  {% else %}
+  <b>{{ month_label }} için kayıt yok.</b>
+  İlk gideri ya da geliri ekleyerek başlayın.
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

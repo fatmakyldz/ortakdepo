@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Kurulum · {{ app_name }}{% endblock %}
+{% block body %}
+<main class="auth">
+  <div class="auth-box wide">
+    <span class="brand">{{ app_name }}</span>
+    <p>Defteri iki ortak birlikte kullanacak. İkinizin giriş bilgilerini bir kez tanımlayın; herkes şifresini sonra Ayarlar'dan değiştirebilir.</p>
+    <div class="card">
+      {% if errors %}<ul class="errors" role="alert">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      <form class="form" method="post" action="/kurulum">
+        {% for n in (1, 2) %}
+        <fieldset class="partner-set">
+          <legend>{{ n }}. ortak{% if n == 1 %} (siz){% endif %}</legend>
+          <div class="grid-2">
+            <div class="field">
+              <label for="ad{{ n }}">Ad</label>
+              <input id="ad{{ n }}" type="text" name="ad{{ n }}" value="{{ form.get('ad' ~ n, '') }}" autocomplete="off" required>
+            </div>
+            <div class="field">
+              <label for="eposta{{ n }}">E-posta</label>
+              <input id="eposta{{ n }}" type="email" name="eposta{{ n }}" value="{{ form.get('eposta' ~ n, '') }}" autocomplete="off" required>
+            </div>
+          </div>
+          <div class="field">
+            <label for="sifre{{ n }}">Şifre</label>
+            <input id="sifre{{ n }}" type="password" name="sifre{{ n }}" minlength="8" autocomplete="new-password" required>
+            <span class="hint">En az 8 karakter. Ödeme hatırlatmaları bu e-posta adresine gelir.</span>
+          </div>
+        </fieldset>
+        {% endfor %}
+        <button class="btn btn-primary btn-block" type="submit">Defteri oluştur</button>
+      </form>
+    </div>
+  </div>
+</main>
+{% endblock %}

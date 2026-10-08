@@ -1,0 +1,7 @@
+data/
+veri/
+deneme-veri/
+.env
+__pycache__/
+.pytest_cache/
+*.pyc

@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, pay_form %}
+{% block title %}Sabit giderler · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Sabit giderler</h1>
+    <p>Leasing, kira, sigorta gibi her ay tekrarlayan ödemeler. Günü yaklaşınca uyarı ve e-posta gelir.</p>
+  </div>
+</div>
+
+{% if errors %}<ul class="errors" role="alert">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+
+<div class="stack-l">
+  {% if unpaid %}
+  <section class="card" aria-labelledby="bekleyen-baslik">
+    <div class="card-head">
+      <h2 id="bekleyen-baslik">Ödenecekler</h2>
+      <span class="num"><b>{{ unpaid_total|tl }}</b></span>
+    </div>
+    <ul class="due-list">
+      {% for item in unpaid %}
+      <li class="{{ item.state }}">
+        <div class="due-row">
+          <b>{{ item.installment.fixed.name }}{% if item.installment.fixed.total_count %} <span class="muted" style="font-weight:400">{{ item.installment.seq }}/{{ item.installment.fixed.total_count }}</span>{% endif %}</b>
+          <span class="num">{{ item.installment.amount|tl }}</span>
+          <span class="when">Vade {{ item.installment.due_date|tarih }}, {{ item.when_text|lower }}</span>
+        </div>
+        {{ pay_form(item, partners, user, today, "/sabit") }}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if cards %}
+  <section aria-labelledby="tanim-baslik" class="stack">
+    <h2 id="tanim-baslik">Tanımlı sabit giderler</h2>
+    {% for c in cards %}
+    <div class="card fx-card">
+      <div class="fx-top">
+        <h3>{{ c.fx.name }}</h3>
+        <span class="num">{{ c.fx.amount|tl }} <span class="muted small" style="font-weight:400">/ ay</span></span>
+      </div>
+      <p class="fx-meta">
+        Her ayın {{ c.fx.due_day }}. günü, {{ c.fx.category.name if c.fx.category else "kategorisiz" }}.
+        {% if c.left is not none %}Kalan {{ c.left }} taksit, toplam {{ c.left_total|tl }}.{% else %}Süresiz.{% endif %}
+        Vadeden {{ c.fx.remind_days }} gün önce hatırlatılır.
+        {% if c.fx.note %}<br>{{ c.fx.note }}{% endif %}
+      </p>
+      <details class="disclose">
+        <summary>Düzenle ya da sonlandır</summary>
+        <form class="form" method="post" action="/sabit/{{ c.fx.id }}/guncelle" style="max-width:none">
+          <div class="grid-2">
+            <div class="field"><label for="fx-ad-{{ c.fx.id }}">Ad</label><input id="fx-ad-{{ c.fx.id }}" type="text" name="ad" value="{{ c.fx.name }}" required></div>
+            <div class="field"><label for="fx-tutar-{{ c.fx.id }}">Aylık tutar (₺)</label><input id="fx-tutar-{{ c.fx.id }}" type="text" inputmode="decimal" name="tutar" value="{{ c.fx.amount|tl_input }}" required></div>
+            <div class="field"><label for="fx-hat-{{ c.fx.id }}">Kaç gün önce hatırlatılsın?</label><input id="fx-hat-{{ c.fx.id }}" type="number" name="hatirlat" min="0" max="30" value="{{ c.fx.remind_days }}"></div>
+          </div>
+          <div class="form-actions"><button class="btn" type="submit">Değişiklikleri kaydet</button></div>
+        </form>
+        <div style="margin-top:14px">
+          <details class="confirm">
+            <summary class="btn btn-danger btn-small">Sabit gideri sonlandır</summary>
+            <form class="confirm-box" method="post" action="/sabit/{{ c.fx.id }}/sonlandir">
+              <span>Ödenmemiş taksitler kalkar, ödenenler kayıtlarda durur. Sonlandırılsın mı?</span>
+              <button class="btn btn-danger btn-small" type="submit">Evet, sonlandır</button>
+            </form>
+          </details>
+        </div>
+      </details>
+    </div>
+    {% endfor %}
+  </section>
+  {% else %}
+  <div class="empty">
+    <b>Tanımlı sabit gider yok.</b>
+    Leasing taksitinizi aşağıdan ekleyin; her ay kendiliğinden ödenecekler listesine düşer.
+  </div>
+  {% endif %}
+
+  <section class="card" id="yeni">
+    <details class="disclose" {{ "open" if open_form }}>
+      <summary>Sabit gider ekle</summary>
+      <form class="form" method="post" action="/sabit" style="max-width:none">
+        <div class="grid-2">
+          <div class="field">
+            <label for="n-ad">Ad</label>
+            <input id="n-ad" type="text" name="ad" value="{{ form.ad }}" placeholder="Örnek: Kamyon leasing" required>
+          </div>
+          <div class="field">
+            <label for="n-tutar">Aylık tutar (₺)</label>
+            <input id="n-tutar" type="text" inputmode="decimal" name="tutar" value="{{ form.tutar }}" placeholder="0,00" required>
+          </div>
+          <div class="field">
+            <label for="n-vade">Sıradaki ödeme tarihi</label>
+            <input id="n-vade" type="date" name="ilk_vade" value="{{ form.ilk_vade }}" required>
+            <span class="hint">Sonraki aylar aynı güne açılır.</span>
+          </div>
+          <div class="field">
+            <label for="n-taksit">Kalan taksit sayısı</label>
+            <input id="n-taksit" type="number" name="taksit" min="1" max="600" value="{{ form.taksit }}">
+            <span class="hint">Kira gibi süresizse boş bırakın.</span>
+          </div>
+          <div class="field">
+            <label for="n-kat">Kategori</label>
+            <select id="n-kat" name="kategori_id" required>
+              {% for c in categories %}<option value="{{ c.id }}" {{ "selected" if form.kategori_id == c.id|string }}>{{ c.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="n-hat">Kaç gün önce hatırlatılsın?</label>
+            <input id="n-hat" type="number" name="hatirlat" min="0" max="30" value="{{ form.hatirlat }}">
+          </div>
+        </div>
+        <div class="field">
+          <label for="n-not">Not <span class="muted" style="font-weight:400">(isteğe bağlı)</span></label>
+          <input id="n-not" type="text" name="not" maxlength="300" value="{{ form.not }}" placeholder="Örnek: sözleşme no, banka">
+        </div>
+        <div class="form-actions"><button class="btn btn-primary" type="submit">Sabit gideri ekle</button></div>
+      </form>
+    </details>
+  </section>
+
+  {% if paid %}
+  <section class="card" aria-labelledby="odenen-baslik">
+    <h2 id="odenen-baslik">Son ödenenler</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Sabit gider</th><th>Vade</th><th>Ödendi</th><th>Ödeyen</th><th class="num">Tutar</th></tr></thead>
+        <tbody>
+          {% for i in paid %}
+          <tr>
+            <th scope="row"><a href="/kayitlar/{{ i.transaction.id }}">{{ i.fixed.name }}</a>{% if i.fixed.total_count %} <span class="muted">{{ i.seq }}/{{ i.fixed.total_count }}</span>{% endif %}</th>
+            <td class="nw">{{ i.due_date|tarih_kisa }}</td>
+            <td class="nw">{{ i.transaction.day|tarih_kisa }}</td>
+            <td>{{ i.transaction.partner.name if i.transaction.partner else "Ortak hesap" }}</td>
+            <td class="num">{{ i.transaction.amount|tl }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="hint" style="margin-top:10px">Yanlış işaretlenen bir ödemeyi geri almak için kaydı açıp silin; taksit yeniden ödenecekler listesine döner.</p>
+  </section>
+  {% endif %}
+
+  {% if ended %}
+  <section aria-labelledby="biten-baslik">
+    <h2 id="biten-baslik" style="margin-bottom:8px">Sonlandırılanlar</h2>
+    <ul class="small muted">
+      {% for fx in ended %}<li>{{ fx.name }}, aylık {{ fx.amount|tl }}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Giriş · {{ app_name }}{% endblock %}
+{% block body %}
+<main class="auth">
+  <div class="auth-box">
+    <span class="brand">{{ app_name }}</span>
+    <p>Günlük gelir, gider ve fişler tek defterde.</p>
+    <div class="card">
+      {% if flashes %}<div class="flash" role="status">{% for f in flashes %}<p class="{{ f.kind }}">{{ f.text }}</p>{% endfor %}</div>{% endif %}
+      {% if error %}<ul class="errors" role="alert"><li>{{ error }}</li></ul>{% endif %}
+      <form class="form" method="post" action="/giris">
+        <div class="field">
+          <label for="eposta">E-posta</label>
+          <input id="eposta" type="email" name="eposta" value="{{ email }}" autocomplete="username" required autofocus>
+        </div>
+        <div class="field">
+          <label for="sifre">Şifre</label>
+          <input id="sifre" type="password" name="sifre" autocomplete="current-password" required>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">Giriş yap</button>
+      </form>
+    </div>
+  </div>
+</main>
+{% endblock %}

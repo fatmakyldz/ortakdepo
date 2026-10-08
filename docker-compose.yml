@@ -1,0 +1,32 @@
+# Uygulama + otomatik HTTPS (Caddy). Kullanım: README.md
+services:
+  defter:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      # Veritabanı ve fişler burada; yedeğini alın. Uygulama kapsayıcıda 10001 numaralı
+      # kullanıcıyla çalışır, bu yüzden ilk kurulumdan önce klasörü ona verin:
+      #   mkdir -p veri && sudo chown -R 10001:10001 veri
+      - ./veri:/data
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN .env dosyasında tanımlı olmalı}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - defter
+
+volumes:
+  caddy_data:
+  caddy_config:

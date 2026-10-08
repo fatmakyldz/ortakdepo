@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}{{ kind_label }} kaydı · {{ app_name }}{% endblock %}
+{% block content %}
+<p class="small" style="margin-bottom:10px"><a href="/kayitlar?ay={{ tx.day.strftime('%Y-%m') }}">Kayıtlara dön</a></p>
+<div class="page-head">
+  <div>
+    <h1>{{ tx.category.name if tx.category else "Kategorisiz" }}</h1>
+    <p>{{ kind_label }} kaydı, {{ tx.day|tarih }} {{ tx.day|gun_adi }}</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="/kayitlar/{{ tx.id }}/duzenle">Düzenle</a>
+    <details class="confirm">
+      <summary class="btn btn-danger">Sil</summary>
+      <form class="confirm-box" method="post" action="/kayitlar/{{ tx.id }}/sil">
+        <span>Kayıt ve fişleri silinsin mi?</span>
+        <button class="btn btn-danger btn-small" type="submit">Evet, sil</button>
+      </form>
+    </details>
+  </div>
+</div>
+
+<div class="stack-l">
+  <section class="card">
+    <p class="detail-amount num {{ tx.kind }}">{{ "+" if tx.kind == "gelir" else "−" }}{{ tx.amount|tl }}</p>
+    <dl class="facts" style="margin-top:14px">
+      <div><dt>{{ "Ödeyen" if tx.kind == "gider" else "Teslim alan" }}</dt><dd>{{ tx.partner.name if tx.partner else "Ortak hesap" }}</dd></div>
+      {% if tx.description %}<div><dt>Açıklama</dt><dd>{{ tx.description }}</dd></div>{% endif %}
+      {% if tx.installment %}<div><dt>Sabit gider</dt><dd><a href="/sabit">{{ tx.installment.fixed.name }}</a>, {{ tx.installment.seq }}. taksit <span class="stamp-paid">ÖDENDİ</span></dd></div>{% endif %}
+      <div><dt>Kaydı giren</dt><dd>{{ tx.created_by.name if tx.created_by else "Bilinmiyor" }}</dd></div>
+    </dl>
+  </section>
+
+  <section class="card" aria-labelledby="fis-baslik">
+    <h2 id="fis-baslik">{{ "Fişler" if tx.kind == "gider" else "Belgeler" }}</h2>
+    {% if tx.receipts %}
+    <div class="gallery">
+      {% for r in tx.receipts %}
+      <figure>
+        {% if r.is_image %}
+        <button class="thumb" type="button" data-lightbox="/fisler/{{ r.id }}/dosya" aria-label="{{ loop.index }}. fişi büyüt">
+          <img src="/fisler/{{ r.id }}/kucuk" alt="{{ loop.index }}. fiş görseli" loading="lazy">
+        </button>
+        {% else %}
+        <a class="thumb" href="/fisler/{{ r.id }}/dosya" target="_blank" rel="noopener">PDF aç</a>
+        {% endif %}
+        <figcaption>
+          <a href="/fisler/{{ r.id }}/dosya" target="_blank" rel="noopener">Aç</a>
+          <form class="inline-form" method="post" action="/fisler/{{ r.id }}/sil">
+            <button class="linklike" type="submit" aria-label="{{ loop.index }}. dosyayı sil">Sil</button>
+          </form>
+        </figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">Bu kayda eklenmiş {{ "fiş" if tx.kind == "gider" else "belge" }} yok.</p>
+    {% endif %}
+
+    {% if tx.receipts|length < max_files %}
+    <form method="post" action="/kayitlar/{{ tx.id }}/fis" enctype="multipart/form-data" style="margin-top:16px">
+      <div class="filebox">
+        <label class="label" for="ek-fis" style="font-weight:650">Dosya ekle</label>
+        <input id="ek-fis" type="file" name="fisler" accept="image/*,application/pdf" multiple required data-previews="ek-onizleme">
+        <div class="previews" id="ek-onizleme"></div>
+        <div><button class="btn btn-small" type="submit">Seçilenleri yükle</button></div>
+      </div>
+    </form>
+    {% endif %}
+  </section>
+</div>
+
+<dialog class="lightbox" id="lightbox" aria-label="Fiş görseli">
+  <img src="" alt="Fiş görseli, büyük">
+  <div class="lb-bar">
+    <a href="#" target="_blank" rel="noopener">Yeni sekmede aç</a>
+    <form method="dialog"><button type="submit">Kapat</button></form>
+  </div>
+</dialog>
+{% endblock %}

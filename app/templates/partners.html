@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Ortak hesabı · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Ortak hesabı</h1>
+    <p>Kim cebinden ne ödedi, kim ne aldı, sonuçta kim kime borçlu.</p>
+  </div>
+</div>
+
+<div class="stack-l">
+  <section class="card" aria-labelledby="durum-baslik">
+    <h2 id="durum-baslik">Bugünkü durum</h2>
+    {% if sheet.transfers %}
+      {% for t in sheet.transfers %}
+      <p class="owe"><b>{{ t.from_user.name }}</b>, <b>{{ t.to_user.name }}</b> ortağına <span class="num">{{ t.amount|tl }}</span> borçlu.</p>
+      <details class="disclose" style="margin-top:12px">
+        <summary>Bu ödeme yapıldı, kaydet</summary>
+        <form class="form" method="post" action="/ortaklar/hesaplasma" style="max-width:none">
+          <input type="hidden" name="kimden" value="{{ t.from_user.id }}">
+          <input type="hidden" name="kime" value="{{ t.to_user.id }}">
+          <div class="grid-2">
+            <div class="field"><label for="h-tutar-{{ loop.index }}">Ödenen tutar (₺)</label><input id="h-tutar-{{ loop.index }}" type="text" inputmode="decimal" name="tutar" value="{{ t.amount|tl_input }}" required></div>
+            <div class="field"><label for="h-gun-{{ loop.index }}">Tarih</label><input id="h-gun-{{ loop.index }}" type="date" name="gun" value="{{ today.isoformat() }}" min="2000-01-01" max="{{ today.isoformat() }}" required></div>
+          </div>
+          <div class="field"><label for="h-not-{{ loop.index }}">Not <span class="muted" style="font-weight:400">(isteğe bağlı)</span></label><input id="h-not-{{ loop.index }}" type="text" name="aciklama" maxlength="300" placeholder="Örnek: havale, elden"></div>
+          <div class="form-actions"><button class="btn btn-primary" type="submit">{{ t.from_user.name }} ödedi, kaydet</button></div>
+        </form>
+      </details>
+      {% endfor %}
+    {% else %}
+      <p class="owe">Hesap denk. Kimsenin kimseye borcu yok.</p>
+    {% endif %}
+  </section>
+
+  <section class="card" aria-labelledby="dokum-baslik">
+    <h2 id="dokum-baslik">Hesabın dökümü</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th></th>{% for l in sheet.lines %}<th class="num">{{ l.user.name }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Cebinden ödediği giderler</th>{% for l in sheet.lines %}<td class="num">{{ l.paid|tl }}</td>{% endfor %}</tr>
+          <tr><th scope="row">Teslim aldığı gelirler</th>{% for l in sheet.lines %}<td class="num">{{ "−" if l.collected }}{{ l.collected|tl }}</td>{% endfor %}</tr>
+          <tr><th scope="row">Cebinden çıkan net</th>{% for l in sheet.lines %}<td class="num">{{ l.out_of_pocket|tl }}</td>{% endfor %}</tr>
+          <tr><th scope="row">Payına düşen ({{ share_label }})</th>{% for l in sheet.lines %}<td class="num">{{ l.fair_share|tl }}</td>{% endfor %}</tr>
+          <tr><th scope="row">Ortağına yaptığı ödemeler</th>{% for l in sheet.lines %}<td class="num">{{ l.sent|tl }}</td>{% endfor %}</tr>
+          <tr><th scope="row">Ortağından aldığı ödemeler</th>{% for l in sheet.lines %}<td class="num">{{ "−" if l.received }}{{ l.received|tl }}</td>{% endfor %}</tr>
+        </tbody>
+        <tfoot>
+          <tr><th scope="row">Sonuç</th>{% for l in sheet.lines %}<td class="num wrap">{% if l.balance > 0 %}<span class="num">{{ l.balance|tl }}</span> alacaklı{% elif l.balance < 0 %}<span class="num">{{ (-l.balance)|tl }}</span> borçlu{% else %}Denk{% endif %}</td>{% endfor %}</tr>
+        </tfoot>
+      </table>
+    </div>
+    <p class="hint" style="margin-top:12px">Ortak hesaptan yapılan ödemeler ve ortak hesaba gelen paralar kimsenin cebinden çıkmadığı için bu hesaba girmez. Paylar <a href="/ayarlar#paylar">Ayarlar</a>'dan değişir.</p>
+  </section>
+
+  <section class="card" aria-labelledby="gecmis-baslik">
+    <h2 id="gecmis-baslik">Ortaklar arası ödemeler</h2>
+    {% if settlements %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tarih</th><th>Kimden kime</th><th>Not</th><th class="num">Tutar</th><th><span class="sr-only">İşlem</span></th></tr></thead>
+        <tbody>
+          {% for s in settlements %}
+          <tr>
+            <td>{{ s.day|tarih }}</td>
+            <td>{{ s.from_user.name }}, {{ s.to_user.name }} ortağına</td>
+            <td>{{ s.note }}</td>
+            <td class="num">{{ s.amount|tl }}</td>
+            <td><form class="inline-form" method="post" action="/ortaklar/hesaplasma/{{ s.id }}/sil"><button class="linklike" type="submit" aria-label="{{ s.day|tarih }} tarihli ödemeyi sil">Sil</button></form></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted">Kayıtlı ödeme yok.</p>
+    {% endif %}
+
+    <details class="disclose" style="margin-top:16px">
+      <summary>Başka bir ödeme kaydet</summary>
+      <form class="form" method="post" action="/ortaklar/hesaplasma" style="max-width:none">
+        <div class="grid-2">
+          <div class="field"><label for="m-kimden">Ödeyen ortak</label>
+            <select id="m-kimden" name="kimden" required>{% for u in users %}<option value="{{ u.id }}" {{ "selected" if u.id == user.id }}>{{ u.name }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="m-kime">Alan ortak</label>
+            <select id="m-kime" name="kime" required>{% for u in users %}<option value="{{ u.id }}" {{ "selected" if u.id != user.id }}>{{ u.name }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="m-tutar">Tutar (₺)</label><input id="m-tutar" type="text" inputmode="decimal" name="tutar" placeholder="0,00" required></div>
+          <div class="field"><label for="m-gun">Tarih</label><input id="m-gun" type="date" name="gun" value="{{ today.isoformat() }}" min="2000-01-01" max="{{ today.isoformat() }}" required></div>
+        </div>
+        <div class="field"><label for="m-not">Not <span class="muted" style="font-weight:400">(isteğe bağlı)</span></label><input id="m-not" type="text" name="aciklama" maxlength="300"></div>
+        <div class="form-actions"><button class="btn btn-primary" type="submit">Ödemeyi kaydet</button></div>
+      </form>
+    </details>
+  </section>
+</div>
+{% endblock %}

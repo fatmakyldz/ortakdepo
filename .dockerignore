@@ -1,0 +1,8 @@
+data/
+veri/
+deneme-veri/
+tests/
+.env
+**/__pycache__/
+.pytest_cache/
+*.md

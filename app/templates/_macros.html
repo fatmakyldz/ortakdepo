@@ -1,0 +1,76 @@
+{% macro icon(name) -%}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+{%- if name == "bugun" %}<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>
+{%- elif name == "kayitlar" %}<path d="M4 6h16M4 12h16M4 18h10"/>
+{%- elif name == "sabit" %}<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>
+{%- elif name == "ortaklar" %}<circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2.5 19c.6-3 2.7-4.5 5.5-4.5s4.9 1.5 5.5 4.5M13.5 15c.8-.3 1.6-.5 2.5-.5 2.800 0 4.900 1.500 5.500 4.500"/>
+{%- elif name == "rapor" %}<path d="M5 20V10M12 20V4M19 20v-7"/>
+{%- elif name == "ayarlar" %}<circle cx="12" cy="12" r="3"/><path d="M12 3v2.500M12 18.500V21M3 12h2.500M18.500 12H21M5.600 5.600l1.800 1.800M16.600 16.600l1.800 1.800M5.600 18.400l1.800-1.800M16.600 7.400l1.800-1.800"/>
+{%- elif name == "arti" %}<path d="M12 5v14M5 12h14"/>
+{%- elif name == "eksi" %}<path d="M5 12h14"/>
+{%- elif name == "sol" %}<path d="M15 5l-7 7 7 7"/>
+{%- elif name == "sag" %}<path d="M9 5l7 7-7 7"/>
+{%- elif name == "atac" %}<path d="M20 11.500l-8 8a5 5 0 01-7-7l8.500-8.500a3.500 3.500 0 015 5L10 17.500a2 2 0 01-3-3L14.500 7"/>
+{%- elif name == "indir" %}<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>
+{%- endif %}</svg>
+{%- endmacro %}
+
+{# Kayıt satırı: liste ve pano için #}
+{% macro tx_row(tx) %}
+<a class="tx" href="/kayitlar/{{ tx.id }}">
+  <span class="tx-title">{{ tx.category.name if tx.category else "Kategorisiz" }}{% if tx.description %}<span class="muted">, {{ tx.description }}</span>{% endif %}</span>
+  <span class="tx-amount {{ tx.kind }}">{{ "+" if tx.kind == "gelir" else "−" }}{{ tx.amount|tl }}</span>
+  <span class="tx-meta">
+    <span>{{ tx.partner.name if tx.partner else "Ortak hesap" }} {{ "ödedi" if tx.kind == "gider" else "aldı" }}</span>
+    {%- if tx.receipts %}<span class="clip">{{ icon("atac") }}{{ tx.receipts|length }} fiş</span>
+    {%- elif tx.kind == "gider" %}<span class="no-receipt">Fiş yok</span>{% endif %}
+  </span>
+</a>
+{% endmacro %}
+
+{# "Kim" seçimi: ortaklar + ortak hesap #}
+{% macro who_chips(partners, selected, name="kim") %}
+<div class="chips">
+  {% for p in partners %}
+  <label class="chip"><input type="radio" name="{{ name }}" value="{{ p.id }}" {{ "checked" if selected == p.id|string }} required><span>{{ p.name }}</span></label>
+  {% endfor %}
+  <label class="chip"><input type="radio" name="{{ name }}" value="ortak" {{ "checked" if selected == "ortak" }}><span>Ortak hesap</span></label>
+</div>
+{% endmacro %}
+
+{# Taksiti ödendi işaretleme formu #}
+{% macro pay_form(item, partners, user, today, donus="/sabit") %}
+<details class="disclose">
+  <summary>Ödendi olarak işaretle</summary>
+  <form class="pay-form" method="post" action="/taksit/{{ item.installment.id }}/ode" enctype="multipart/form-data">
+    <input type="hidden" name="donus" value="{{ donus }}">
+    <div class="grid-2">
+      <div class="field">
+        <label for="pg-{{ item.installment.id }}">Ödeme tarihi</label>
+        <input id="pg-{{ item.installment.id }}" type="date" name="gun" value="{{ today.isoformat() }}" min="2000-01-01" max="{{ today.isoformat() }}" required>
+      </div>
+      <div class="field">
+        <label for="pt-{{ item.installment.id }}">Ödenen tutar (₺)</label>
+        <input id="pt-{{ item.installment.id }}" type="text" inputmode="decimal" name="tutar" value="{{ item.installment.amount|tl_input }}" required>
+      </div>
+    </div>
+    <fieldset>
+      <legend>Kim ödedi?</legend>
+      {{ who_chips(partners, user.id|string) }}
+    </fieldset>
+    <div class="field">
+      <label for="pf-{{ item.installment.id }}">Dekont (isteğe bağlı)</label>
+      <input id="pf-{{ item.installment.id }}" type="file" name="fisler" accept="image/*,application/pdf" multiple>
+    </div>
+    <div><button class="btn btn-primary" type="submit">Ödemeyi kaydet</button></div>
+  </form>
+</details>
+{% endmacro %}
+
+{% macro month_nav(base, prev_ay, next_ay, label, is_current) %}
+<div class="month-nav">
+  <a href="{{ base }}?ay={{ prev_ay }}" aria-label="Önceki ay">{{ icon("sol") }}</a>
+  <strong>{{ label }}</strong>
+  <a href="{{ base }}?ay={{ next_ay }}" aria-label="Sonraki ay" {% if is_current %}aria-disabled="true" tabindex="-1"{% endif %}>{{ icon("sag") }}</a>
+</div>
+{% endmacro %}

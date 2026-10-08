@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Ayarlar · {{ app_name }}{% endblock %}
+{% macro cat_list(cats) %}
+<ul class="tx-list">
+  {% for c in cats %}
+  <li style="padding:10px 0">
+    <form method="post" action="/ayarlar/kategori/{{ c.id }}/ad" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <label class="sr-only" for="kat-{{ c.id }}">Kategori adı</label>
+      <input id="kat-{{ c.id }}" type="text" name="ad" value="{{ c.name }}" maxlength="60" required style="flex:1 1 180px;min-height:40px{{ ';color:var(--muted)' if not c.is_active }}">
+      <button class="btn btn-quiet btn-small" type="submit">Adı kaydet</button>
+      <button class="btn btn-quiet btn-small" type="submit" formaction="/ayarlar/kategori/{{ c.id }}/durum">
+        {%- if not c.is_active %}Yeniden aç{% elif used.get(c.id) %}Kullanımdan kaldır{% else %}Sil{% endif -%}
+      </button>
+    </form>
+    {% if not c.is_active %}<span class="hint">Kullanımdan kaldırıldı, {{ used.get(c.id, 0) }} eski kayıtta duruyor.</span>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+{% block content %}
+<div class="page-head"><div><h1>Ayarlar</h1></div></div>
+
+<div class="stack-l">
+  <section class="card" aria-labelledby="profil-baslik">
+    <h2 id="profil-baslik">Bilgileriniz</h2>
+    <form class="form" method="post" action="/ayarlar/profil">
+      <div class="grid-2">
+        <div class="field"><label for="p-ad">Ad</label><input id="p-ad" type="text" name="ad" value="{{ user.name }}" maxlength="80" required></div>
+        <div class="field"><label for="p-eposta">E-posta</label><input id="p-eposta" type="email" name="eposta" value="{{ user.email }}" required></div>
+      </div>
+      <label style="display:flex;gap:10px;align-items:flex-start">
+        <input type="checkbox" name="bildirim" value="1" {{ "checked" if user.notify_email }} style="width:20px;height:20px;margin-top:2px;flex:none">
+        <span>Ödeme günü yaklaşınca bana e-posta gönder</span>
+      </label>
+      <div class="form-actions"><button class="btn btn-primary" type="submit">Bilgileri kaydet</button></div>
+    </form>
+  </section>
+
+  <section class="card" aria-labelledby="sifre-baslik">
+    <h2 id="sifre-baslik">Şifre</h2>
+    <form class="form" method="post" action="/ayarlar/sifre">
+      <div class="field"><label for="s-eski">Mevcut şifre</label><input id="s-eski" type="password" name="eski" autocomplete="current-password" required></div>
+      <div class="grid-2">
+        <div class="field"><label for="s-yeni">Yeni şifre</label><input id="s-yeni" type="password" name="yeni" minlength="8" autocomplete="new-password" required></div>
+        <div class="field"><label for="s-tekrar">Yeni şifre, tekrar</label><input id="s-tekrar" type="password" name="tekrar" minlength="8" autocomplete="new-password" required></div>
+      </div>
+      <div class="form-actions"><button class="btn" type="submit">Şifreyi değiştir</button></div>
+    </form>
+  </section>
+
+  <section class="card" id="paylar" aria-labelledby="pay-baslik">
+    <h2 id="pay-baslik">Ortaklık payları</h2>
+    <p class="hint" style="margin-bottom:12px">Kâr ve gider bu oranla bölüşülür. Ortak bakiyesi geçmiş kayıtlar dahil yeni orana göre yeniden hesaplanır.</p>
+    <form class="form" method="post" action="/ayarlar/pay">
+      <div class="grid-2">
+        {% for u in users %}
+        <div class="field"><label for="pay-{{ u.id }}">{{ u.name }} (%)</label><input id="pay-{{ u.id }}" type="text" inputmode="decimal" name="pay_{{ u.id }}" value="{{ share_text(u.share_bp) }}" required></div>
+        {% endfor %}
+      </div>
+      <div class="form-actions"><button class="btn" type="submit">Payları kaydet</button></div>
+    </form>
+  </section>
+
+  <section class="card" id="kategoriler" aria-labelledby="kat-baslik">
+    <h2 id="kat-baslik">Kategoriler</h2>
+    <h3 style="margin-top:4px">Gider</h3>
+    {{ cat_list(expense_cats) }}
+    <h3 style="margin-top:18px">Gelir</h3>
+    {{ cat_list(income_cats) }}
+    <form method="post" action="/ayarlar/kategori" style="margin-top:18px;padding-top:16px;border-top:2px solid var(--ink)">
+      <div class="grid-2" style="align-items:end">
+        <div class="field"><label for="k-ad">Yeni kategori</label><input id="k-ad" type="text" name="ad" maxlength="60" placeholder="Örnek: Otoyol / köprü" required></div>
+        <div class="field"><label for="k-tur">Türü</label><select id="k-tur" name="tur"><option value="gider">Gider</option><option value="gelir">Gelir</option></select></div>
+        <button class="btn" type="submit">Kategori ekle</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card" aria-labelledby="eposta-baslik">
+    <h2 id="eposta-baslik">E-posta hatırlatmaları</h2>
+    {% if smtp_ok and reminders_enabled %}
+    <p>Açık. Hatırlatmalar <b>{{ smtp_from }}</b> adresinden, her gün saat {{ "%02d"|format(reminder_hour) }}.00'dan sonra gönderilir: vade yaklaşınca, vade günü ve ödeme gecikirse haftada bir.</p>
+    <form method="post" action="/ayarlar/test-eposta" style="margin-top:12px"><button class="btn" type="submit">Bana deneme e-postası gönder</button></form>
+    {% elif smtp_ok %}
+    <p>E-posta sunucusu tanımlı ama hatırlatmalar kapalı. Açmak için sunucudaki <code>.env</code> dosyasında <code>REMINDERS_ENABLED=1</code> yapın.</p>
+    {% else %}
+    <p>E-posta sunucusu tanımlı değil; uyarılar şimdilik yalnızca bu sayfalarda görünür. Açmak için sunucudaki <code>.env</code> dosyasına SMTP bilgilerini yazıp uygulamayı yeniden başlatın. Adımlar README dosyasında.</p>
+    {% endif %}
+  </section>
+
+  <form method="post" action="/cikis"><button class="btn btn-quiet" type="submit">Çıkış yap</button></form>
+</div>
+{% endblock %}
