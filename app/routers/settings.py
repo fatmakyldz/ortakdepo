@@ -1,8 +1,7 @@
-"""Ayarlar: profil, ortaklık payı, kategoriler, e-posta."""
+"""Ayarlar: profil, kategoriler, e-posta."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-import math
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -16,7 +15,6 @@ from ..services import reminders
 from ..textutil import clean_text, name_key
 from ..web import flash, redirect, render
 from .auth import EMAIL_RE, MIN_PASSWORD
-from .partners import share_text
 
 router = APIRouter()
 
@@ -31,7 +29,6 @@ def settings_page(request: Request, db: Session = Depends(get_db), user: User = 
     )
     return render(request, "settings.html", {
         "users": list(db.scalars(select(User).order_by(User.id))),
-        "share_text": share_text,
         "expense_cats": [c for c in cats if c.kind == GIDER],
         "income_cats": [c for c in cats if c.kind == GELIR],
         "used": used,
@@ -39,6 +36,7 @@ def settings_page(request: Request, db: Session = Depends(get_db), user: User = 
         "smtp_from": settings.smtp_from,
         "reminder_hour": settings.reminder_hour,
         "reminders_enabled": settings.reminders_enabled,
+        "reminder_to": settings.reminder_to,
     })
 
 
@@ -56,7 +54,9 @@ def update_profile(
     elif db.scalar(select(User.id).where(User.email == email, User.id != user.id)):
         flash(request, "Bu e-posta adresini diğer ortak kullanıyor.", "hata")
     else:
-        user.name, user.email, user.notify_email = name, email, bildirim == "1"
+        user.name, user.email = name, email
+        if not settings.reminder_to:
+            user.notify_email = bildirim == "1"
         db.commit()
         flash(request, "Bilgileriniz güncellendi.")
     return redirect("/ayarlar")
@@ -79,33 +79,6 @@ def change_password(
         db.commit()
         start_session(request, user)  # bu cihaz açık kalır, eski oturumlar düşer
         flash(request, "Şifreniz değişti. Diğer cihazlarda yeniden giriş yapmanız gerekecek.")
-    return redirect("/ayarlar")
-
-
-@router.post("/ayarlar/pay")
-async def update_shares(
-    request: Request, db: Session = Depends(get_db), user: User = Depends(current_user),
-):
-    form = await request.form()
-    users = list(db.scalars(select(User).order_by(User.id)))
-    shares: dict[int, int] = {}
-    try:
-        for u in users:
-            raw = str(form.get(f"pay_{u.id}", "")).strip().replace(",", ".")
-            number = float(raw)
-            if not math.isfinite(number) or not (0 <= number <= 100):
-                raise ValueError
-            shares[u.id] = round(number * 100)
-    except (ValueError, OverflowError):
-        flash(request, "Payları yüzde olarak yazın. Örnek: 50", "hata")
-        return redirect("/ayarlar")
-    if sum(shares.values()) != 10000:
-        flash(request, "Payların toplamı %100 olmalı.", "hata")
-        return redirect("/ayarlar")
-    for u in users:
-        u.share_bp = shares[u.id]
-    db.commit()
-    flash(request, "Ortaklık payları güncellendi. Ortak bakiyesi yeni paylara göre hesaplanıyor.")
     return redirect("/ayarlar")
 
 
@@ -208,13 +181,14 @@ def toggle_category(
 
 @router.post("/ayarlar/test-eposta")
 def test_email(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    to = settings.reminder_to or [user.email]
     try:
         reminders.send_mail(
-            [user.email],
+            to,
             f"{settings.app_name}: deneme e-postası",
             "Bu bir deneme e-postasıdır. Ödeme hatırlatmaları bu adrese gelecek.",
         )
-        flash(request, f"Deneme e-postası {user.email} adresine gönderildi.")
+        flash(request, f"Deneme e-postası {', '.join(to)} adresine gönderildi.")
     except reminders.MailError as exc:
         flash(request, str(exc), "hata")
     return redirect("/ayarlar")

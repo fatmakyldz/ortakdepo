@@ -3,8 +3,8 @@
 {% block body %}
 <main class="auth">
   <div class="auth-box wide">
-    <span class="brand">{{ app_name }}</span>
-    <p>Defteri iki ortak birlikte kullanacak. İkinizin giriş bilgilerini bir kez tanımlayın; herkes şifresini sonra Ayarlar'dan değiştirebilir.</p>
+    <span class="brand"><img class="logo-light" src="/static/img/logo.png" alt="{{ app_name }}"><img class="logo-dark" src="/static/img/logo-dark.png" alt="" aria-hidden="true"></span>
+    <p><b>{{ app_name }}</b>. Defteri iki ortak birlikte kullanacak. İkinizin giriş bilgilerini bir kez tanımlayın; herkes şifresini sonra Ayarlar'dan değiştirebilir.</p>
     <div class="card">
       {% if errors %}<ul class="errors" role="alert">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
       <form class="form" method="post" action="/kurulum">

@@ -17,13 +17,17 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .db import Base
+from .money import TRY
 
 GIDER = "gider"
 GELIR = "gelir"
+SIRKET_ODEDI = "sirket_odedi"
+ORTAK_YATIRDI = "ortak_yatirdi"
+PAYMENT_LABELS = {SIRKET_ODEDI: "Şirket ortağa ödedi", ORTAK_YATIRDI: "Ortak şirkete yatırdı"}
 
 
 class User(Base):
-    """Ortak. `share_bp`: ortaklık payı, yüzde × 100 (5000 = %50)."""
+    """Ortak. `share_bp` eski sürümden kalma, hesapta kullanılmıyor."""
 
     __tablename__ = "users"
 
@@ -106,7 +110,8 @@ class FixedExpense(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
-    amount: Mapped[int] = mapped_column(Integer)  # aylık tutar, kuruş
+    amount: Mapped[int] = mapped_column(Integer)  # aylık tutar, para biriminin en küçük birimiyle
+    currency: Mapped[str] = mapped_column(String(3), default=TRY)
     due_day: Mapped[int] = mapped_column(Integer)  # 1-31; kısa aylarda ayın son günü
     first_due: Mapped[date] = mapped_column(Date)  # ilk taksitin vadesi
     total_count: Mapped[int | None] = mapped_column(Integer, nullable=True)  # boş = süresiz
@@ -146,21 +151,35 @@ class Installment(Base):
         return self.transaction_id is not None
 
 
-class Settlement(Base):
-    """Ortaklar arasında elden/havale ile yapılan hesap kapatma ödemesi."""
+class PartnerPayment(Base):
+    """Şirket ile ortak arasındaki ödeme: şirket ortağa ödedi ya da ortak şirkete yatırdı."""
 
-    __tablename__ = "settlements"
+    __tablename__ = "partner_payments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     day: Mapped[date] = mapped_column(Date)
-    from_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    to_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    direction: Mapped[str] = mapped_column(String(16))
     amount: Mapped[int] = mapped_column(Integer)
     note: Mapped[str] = mapped_column(String(300), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    from_user: Mapped[User] = relationship(foreign_keys=[from_user_id], lazy="joined")
-    to_user: Mapped[User] = relationship(foreign_keys=[to_user_id], lazy="joined")
+    user: Mapped[User] = relationship(lazy="joined")
+
+
+class ExchangeRate(Base):
+    """Günlük döviz kuru: value = 1 birim dövizin TL karşılığı × 10.000."""
+
+    __tablename__ = "exchange_rates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    currency: Mapped[str] = mapped_column(String(3))
+    day: Mapped[date] = mapped_column(Date, index=True)
+    value: Mapped[int] = mapped_column(Integer)
+    source: Mapped[str] = mapped_column(String(8))
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (UniqueConstraint("currency", "day", "source", name="uq_rate_day_source"),)
 
 
 class ReminderLog(Base):

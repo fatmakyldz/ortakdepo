@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon, pay_form %}
+{% from "_macros.html" import icon, pay_form, due_amount %}
 {% block title %}Sabit giderler · {{ app_name }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -12,18 +12,46 @@
 {% if errors %}<ul class="errors" role="alert">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
 
 <div class="stack-l">
+  {% if needs_rate %}
+  <section class="card" aria-labelledby="kur-baslik">
+    <div class="card-head">
+      <h2 id="kur-baslik">Euro kuru</h2>
+      <form class="inline-form" method="post" action="/sabit/kur/yenile"><button class="linklike" type="submit">TCMB'den yenile</button></form>
+    </div>
+    {% if rate %}
+    <p><b class="num">1 € = {{ rate.value|kur }} ₺</b> <span class="muted">({{ "TCMB döviz satış" if rate.source == "tcmb" else "elle girildi" }}, {{ rate.day|tarih }})</span></p>
+    <p class="hint" style="margin-top:4px">Euro taksitlerin TL karşılığı bu kurla hesaplanır. Ödendi işaretlerken bankanın çektiği gerçek tutarı yazabilirsiniz.</p>
+    {% else %}
+    <p class="no-receipt">Kur henüz alınamadı; euro taksitlerin TL karşılığı gösterilemiyor. TCMB'den yenileyin ya da aşağıdan elle girin.</p>
+    {% endif %}
+    <details class="disclose" style="margin-top:12px">
+      <summary>Kuru elle gir</summary>
+      <form class="form" method="post" action="/sabit/kur" style="max-width:none">
+        <div class="grid-2">
+          <div class="field">
+            <label for="kur">1 € kaç ₺?</label>
+            <input id="kur" type="text" inputmode="decimal" name="kur" placeholder="Örnek: 57,2034" required>
+            <span class="hint">Leasing şirketi başka bir kur uyguluyorsa bugünün kurunu yazın; TCMB kuru yerine bu kullanılır.</span>
+          </div>
+        </div>
+        <div class="form-actions"><button class="btn" type="submit">Kuru kaydet</button></div>
+      </form>
+    </details>
+  </section>
+  {% endif %}
+
   {% if unpaid %}
   <section class="card" aria-labelledby="bekleyen-baslik">
     <div class="card-head">
       <h2 id="bekleyen-baslik">Ödenecekler</h2>
-      <span class="num"><b>{{ unpaid_total|tl }}</b></span>
+      <span class="num"><b>{{ "≈ " if unpaid_estimate }}{{ unpaid_total|tl }}</b></span>
     </div>
     <ul class="due-list">
       {% for item in unpaid %}
       <li class="{{ item.state }}">
         <div class="due-row">
           <b>{{ item.installment.fixed.name }}{% if item.installment.fixed.total_count %} <span class="muted" style="font-weight:400">{{ item.installment.seq }}/{{ item.installment.fixed.total_count }}</span>{% endif %}</b>
-          <span class="num">{{ item.installment.amount|tl }}</span>
+          <span class="num">{{ due_amount(item) }}</span>
           <span class="when">Vade {{ item.installment.due_date|tarih }}, {{ item.when_text|lower }}</span>
         </div>
         {{ pay_form(item, partners, user, today, "/sabit") }}
@@ -40,11 +68,11 @@
     <div class="card fx-card">
       <div class="fx-top">
         <h3>{{ c.fx.name }}</h3>
-        <span class="num">{{ c.fx.amount|tl }} <span class="muted small" style="font-weight:400">/ ay</span></span>
+        <span class="num">{{ c.fx.amount|para(c.fx.currency) }} <span class="muted small" style="font-weight:400">/ ay</span></span>
       </div>
       <p class="fx-meta">
         Her ayın {{ c.fx.due_day }}. günü, {{ c.fx.category.name if c.fx.category else "kategorisiz" }}.
-        {% if c.left is not none %}Kalan {{ c.left }} taksit, toplam {{ c.left_total|tl }}.{% else %}Süresiz.{% endif %}
+        {% if c.left is not none %}Kalan {{ c.left }} taksit, toplam {{ c.left_total|para(c.fx.currency) }}.{% else %}Süresiz.{% endif %}
         Vadeden {{ c.fx.remind_days }} gün önce hatırlatılır.
         {% if c.fx.note %}<br>{{ c.fx.note }}{% endif %}
       </p>
@@ -53,7 +81,7 @@
         <form class="form" method="post" action="/sabit/{{ c.fx.id }}/guncelle" style="max-width:none">
           <div class="grid-2">
             <div class="field"><label for="fx-ad-{{ c.fx.id }}">Ad</label><input id="fx-ad-{{ c.fx.id }}" type="text" name="ad" value="{{ c.fx.name }}" required></div>
-            <div class="field"><label for="fx-tutar-{{ c.fx.id }}">Aylık tutar (₺)</label><input id="fx-tutar-{{ c.fx.id }}" type="text" inputmode="decimal" name="tutar" value="{{ c.fx.amount|tl_input }}" required></div>
+            <div class="field"><label for="fx-tutar-{{ c.fx.id }}">Aylık tutar ({{ CURRENCIES[c.fx.currency] }})</label><input id="fx-tutar-{{ c.fx.id }}" type="text" inputmode="decimal" name="tutar" value="{{ c.fx.amount|tl_input }}" required></div>
             <div class="field"><label for="fx-hat-{{ c.fx.id }}">Kaç gün önce hatırlatılsın?</label><input id="fx-hat-{{ c.fx.id }}" type="number" name="hatirlat" min="0" max="30" value="{{ c.fx.remind_days }}"></div>
           </div>
           <div class="form-actions"><button class="btn" type="submit">Değişiklikleri kaydet</button></div>
@@ -88,8 +116,14 @@
             <input id="n-ad" type="text" name="ad" value="{{ form.ad }}" placeholder="Örnek: Kamyon leasing" required>
           </div>
           <div class="field">
-            <label for="n-tutar">Aylık tutar (₺)</label>
-            <input id="n-tutar" type="text" inputmode="decimal" name="tutar" value="{{ form.tutar }}" placeholder="0,00" required>
+            <label for="n-tutar">Aylık tutar</label>
+            <div class="amount-row">
+              <input id="n-tutar" type="text" inputmode="decimal" name="tutar" value="{{ form.tutar }}" placeholder="0,00" required>
+              <select name="para_birimi" aria-label="Para birimi">
+                {% for code, sym in CURRENCIES.items() %}<option value="{{ code }}" {{ "selected" if form.para_birimi == code }}>{{ sym }} {{ code }}</option>{% endfor %}
+              </select>
+            </div>
+            <span class="hint">Leasing euro ise € seçin; TL karşılığı günün TCMB kuruyla gösterilir.</span>
           </div>
           <div class="field">
             <label for="n-vade">Sıradaki ödeme tarihi</label>

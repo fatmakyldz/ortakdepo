@@ -7,8 +7,9 @@ from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..models import GELIR, GIDER, Category, FixedExpense, Installment, Transaction, User
+from ..models import GELIR, GIDER, Category, Transaction, User
 from ..timeutil import AYLAR_KISA, add_months, month_bounds
+from . import fixed as fixed_service
 
 
 @dataclass
@@ -130,16 +131,9 @@ def period_report(db: Session, start: date, end: date) -> PeriodReport:
     rep.days = [days[d] for d in sorted(days, reverse=True)]
     rep.count = sum(d.count for d in rep.days)
 
-    unpaid = db.execute(
-        select(func.coalesce(func.sum(Installment.amount), 0), func.count(Installment.id))
-        .join(FixedExpense)
-        .where(
-            Installment.transaction_id.is_(None),
-            FixedExpense.is_active,
-            Installment.due_date.between(start, end),
-        )
-    ).one()
-    rep.unpaid_fixed, rep.unpaid_fixed_count = unpaid
+    items = [i for i in fixed_service.unpaid_items(db, until=end) if i.installment.due_date >= start]
+    rep.unpaid_fixed = sum(i.try_amount or 0 for i in items)
+    rep.unpaid_fixed_count = len(items)
     return rep
 
 

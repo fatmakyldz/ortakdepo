@@ -67,7 +67,7 @@ Dikkat edilecekler:
 
 | Değişken | Ne işe yarar | Varsayılan |
 |---|---|---|
-| `APP_NAME` | Üstte görünen ad | Ortak Defter |
+| `APP_NAME` | Sekme başlığında ve e-postalarda görünen ad | Sezkar Muhasebe |
 | `BASE_URL` | E-postalardaki bağlantının adresi | http://localhost:8000 |
 | `HTTPS_ONLY` | Oturum çerezi yalnızca HTTPS'te gitsin | 0 |
 | `DATA_DIR` | Veritabanı ve fişlerin klasörü | ./data |
@@ -75,6 +75,8 @@ Dikkat edilecekler:
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TLS` | E-posta sunucusu | boş (kapalı) |
 | `REMINDER_HOUR` | Hatırlatmaların gideceği en erken saat | 9 |
 | `REMINDERS_ENABLED` | Hatırlatmaları aç/kapat | 1 |
+| `REMINDER_TO` | Hatırlatmaların gideceği adres(ler), virgülle ayrılır; boşsa ortakların kendi adresleri | boş |
+| `RATES_ENABLED` | TCMB'den günlük euro kuru çekilsin mi | 1 |
 | `MAX_UPLOAD_MB` | Dosya başına yükleme sınırı | 15 |
 | `SECRET_KEY` | Oturum imza anahtarı | ilk açılışta üretilir, veri klasöründe saklanır |
 
@@ -99,27 +101,33 @@ Hatırlatma kuralı, her sabit gider için ayrı:
 2. vade günü bir kez,
 3. ödeme geciktiyse, "ödendi" işaretlenene kadar haftada bir.
 
-Aynı gün birden fazla ödeme varsa tek e-postada toplanır. Ayarlar'da bildirimi açık olan ortaklara gider. SMTP tanımlı değilse uyarılar yalnızca "Bugün" ve "Sabit giderler" sayfalarında görünür.
+Aynı gün birden fazla ödeme varsa tek e-postada toplanır. `REMINDER_TO` tanımlıysa yalnızca o adrese (örneğin şirketin ortak posta kutusuna), değilse Ayarlar'da bildirimi açık olan ortaklara gider. SMTP tanımlı değilse uyarılar yalnızca "Bugün" ve "Sabit giderler" sayfalarında görünür.
 
 ## Ortak hesabı nasıl hesaplanıyor?
 
 Her kayıtta "kim ödedi / parayı kim aldı" seçilir: ortaklardan biri ya da **Ortak hesap** (şirket hesabı, kasa).
 
 - Bir ortağın **cebinden çıkan net** = ödediği giderler − teslim aldığı gelirler.
-- İki ortağın cebinden dönen toplam, ortaklık payına göre (varsayılan %50 / %50) bölüşülür: bu "payına düşen"dir.
-- Cebinden payına düşenden fazla çıkan ortak **alacaklı**, az çıkan **borçlu** olur.
-- Ortakların birbirine yaptığı ödemeler ("Bu ödeme yapıldı, kaydet") bakiyeyi kapatır.
+- Cebinden çıkan net kadar ortak **şirketten alacaklı** olur; teslim aldığı gelir ödediğinden fazlaysa **şirkete borçlu** olur.
+- Ortaklar birbirine borçlanmaz; her ortağın hesabı yalnızca şirketle görülür.
+- Şirketin ortağa yaptığı ödeme ("Şirket ödedi, kaydet") alacağı düşürür; ortağın şirkete yatırdığı para borcu kapatır.
 - "Ortak hesap" seçilen kayıtlar kimsenin cebinden çıkmadığı için bu hesaba girmez; kâr/zarar raporuna ise girer.
 
-Örnek: Ortak A 1.000 ₺ yakıtı cebinden ödedi. Payına düşen 500 ₺ olduğu için ortak B, A'ya 500 ₺ borçlu görünür. B 500 ₺ gönderip kaydedince hesap denkleşir.
+Örnek: Ortak A 1.000 ₺ yakıtı cebinden ödedi. A, şirketten 1.000 ₺ alacaklı görünür; B'nin hesabı değişmez. Şirket A'ya 1.000 ₺ ödeyip kaydedince A'nın hesabı denkleşir.
 
-Tutarlar veritabanında kuruş olarak (tam sayı) tutulur; bölüşümde kuruş kaybolmaz.
+Tutarlar veritabanında kuruş olarak (tam sayı) tutulur.
 
 ## Sabit gider eklerken
 
 "Sıradaki ödeme tarihi"ne **bundan sonraki ilk taksitin** tarihini, "kalan taksit sayısı"na o tarihten itibaren kalan taksiti yazın (kira gibi süresizse boş bırakın). Geçmişte ödenmiş taksitleri girmek gerekmez. Taksit tutarı ay ay değişiyorsa, ödendi işaretlerken gerçek ödenen tutarı yazabilirsiniz.
 
 Yanlış işaretlenen bir ödemeyi geri almak için oluşan gider kaydını açıp silin; taksit yeniden "ödenecekler"e döner.
+
+### Euro cinsinden leasing
+
+Tutarın yanından **€** seçin. Taksitler euro olarak tutulur, yanında günün kuruyla TL karşılığı gösterilir; pano ve rapordaki "bu ay ödenecek sabit giderler" de bu tahminle hesaplanır. Kur TCMB'nin günlük bülteninden (döviz satış) alınır: uygulama günde bir kez çeker, internet yoksa son bilinen kuru kullanır. Leasing şirketi başka bir kur uyguluyorsa "Sabit giderler > Euro kuru > Kuru elle gir" ile bugünün kurunu yazın; o gün için elle girilen kur TCMB kurunun önüne geçer.
+
+"Ödendi" işaretlerken TL tutarı kurla dolu gelir; bankanın gerçekten çektiği tutarı yazıp düzeltin. Kayıtlara ve raporlara giren tutar her zaman ödenen TL'dir, muhasebe dökümü döviz görmez (yalnızca "Sabit ödemeler" sayfasında ayrı bir sütunda bilgi olarak durur).
 
 ## Fişler
 

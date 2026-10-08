@@ -3,8 +3,8 @@
 {% block body %}
 <main class="auth">
   <div class="auth-box">
-    <span class="brand">{{ app_name }}</span>
-    <p>Günlük gelir, gider ve fişler tek defterde.</p>
+    <span class="brand"><img class="logo-light" src="/static/img/logo.png" alt="{{ app_name }}"><img class="logo-dark" src="/static/img/logo-dark.png" alt="" aria-hidden="true"></span>
+    <p><b>{{ app_name }}</b>. Günlük gelir, gider ve fişler tek defterde.</p>
     <div class="card">
       {% if flashes %}<div class="flash" role="status">{% for f in flashes %}<p class="{{ f.kind }}">{{ f.text }}</p>{% endfor %}</div>{% endif %}
       {% if error %}<ul class="errors" role="alert"><li>{{ error }}</li></ul>{% endif %}

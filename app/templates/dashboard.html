@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon, tx_row, pay_form %}
+{% from "_macros.html" import icon, tx_row, pay_form, due_amount %}
 {% block title %}Bugün · {{ app_name }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -15,7 +15,7 @@
   <li class="{{ item.state }}">
     <div class="alert-row">
       <b>{{ item.installment.fixed.name }}</b>
-      <span class="num">{{ item.installment.amount|tl }}</span>
+      <span class="num">{{ due_amount(item) }}</span>
       <span class="when">{{ item.when_text }}, vade {{ item.installment.due_date|tarih }}</span>
     </div>
     {{ pay_form(item, partners, user, today, "/") }}
@@ -68,15 +68,17 @@
         <h2 id="ay-baslik">{{ month_label }}</h2>
         <a href="/rapor">Raporu aç</a>
       </div>
+      <div class="stats">
+        <div class="stat stat-gelir"><span class="stat-label">Gelir</span><b class="num">{{ month.income|tl }}</b></div>
+        <div class="stat stat-gider"><span class="stat-label">Gider</span><b class="num">{{ month.expense|tl }}</b></div>
+        <div class="stat stat-net"><span class="stat-label">Net</span><b class="num {{ 'gider' if month.net < 0 else '' }}">{{ month.net|tl }}</b></div>
+      </div>
+      {% if month.unpaid_fixed %}
       <dl class="statement">
-        <div><dt>Gelir</dt><dd>{{ month.income|tl }}</dd></div>
-        <div><dt>Gider</dt><dd>{{ month.expense|tl }}</dd></div>
-        <div class="total"><dt>Net</dt><dd class="{{ 'gider' if month.net < 0 else '' }}">{{ month.net|tl }}</dd></div>
-        {% if month.unpaid_fixed %}
         <div><dt>Bu ay ödenecek sabit giderler ({{ month.unpaid_fixed_count }})</dt><dd>−{{ month.unpaid_fixed|tl }}</dd></div>
         <div class="after"><dt>Onlar da ödenince</dt><dd class="{{ 'gider' if month.net_after_fixed < 0 else '' }}">{{ month.net_after_fixed|tl }}</dd></div>
-        {% endif %}
       </dl>
+      {% endif %}
     </section>
 
     <section class="card" aria-labelledby="ortak-baslik">
@@ -84,12 +86,12 @@
         <h2 id="ortak-baslik">Ortak hesabı</h2>
         <a href="/ortaklar">Dökümü gör</a>
       </div>
-      {% if sheet.transfers %}
-        {% for t in sheet.transfers %}
-        <p class="owe"><b>{{ t.from_user.name }}</b>, <b>{{ t.to_user.name }}</b> ortağına <span class="num">{{ t.amount|tl }}</span> borçlu.</p>
+      {% if sheet.open %}
+        {% for l in sheet.open %}
+        <p class="owe"><b>{{ l.user.name }}</b>, şirketten <span class="num">{{ (l.balance if l.balance > 0 else -l.balance)|tl }}</span> {{ "alacaklı" if l.balance > 0 else "borçlu" }}.</p>
         {% endfor %}
       {% else %}
-        <p class="owe">Hesap denk. Kimsenin kimseye borcu yok.</p>
+        <p class="owe">Hesap denk. Kimsenin şirketten alacağı yok.</p>
       {% endif %}
     </section>
   </div>

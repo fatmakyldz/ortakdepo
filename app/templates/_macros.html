@@ -5,13 +5,16 @@
 {%- elif name == "sabit" %}<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>
 {%- elif name == "ortaklar" %}<circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2.5 19c.6-3 2.7-4.5 5.5-4.5s4.9 1.5 5.5 4.5M13.5 15c.8-.3 1.6-.5 2.5-.5 2.800 0 4.900 1.500 5.500 4.500"/>
 {%- elif name == "rapor" %}<path d="M5 20V10M12 20V4M19 20v-7"/>
-{%- elif name == "ayarlar" %}<circle cx="12" cy="12" r="3"/><path d="M12 3v2.500M12 18.500V21M3 12h2.500M18.500 12H21M5.600 5.600l1.800 1.800M16.600 16.600l1.800 1.800M5.600 18.400l1.800-1.800M16.600 7.400l1.800-1.800"/>
+{%- elif name == "ayarlar" %}<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
+{%- elif name == "gunes" %}<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>
 {%- elif name == "arti" %}<path d="M12 5v14M5 12h14"/>
 {%- elif name == "eksi" %}<path d="M5 12h14"/>
 {%- elif name == "sol" %}<path d="M15 5l-7 7 7 7"/>
 {%- elif name == "sag" %}<path d="M9 5l7 7-7 7"/>
 {%- elif name == "atac" %}<path d="M20 11.500l-8 8a5 5 0 01-7-7l8.500-8.500a3.500 3.500 0 015 5L10 17.500a2 2 0 01-3-3L14.500 7"/>
 {%- elif name == "indir" %}<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>
+{%- elif name == "ay" %}<path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/>
+{%- elif name == "cikis" %}<path d="M10 4H6a2 2 0 00-2 2v12a2 2 0 002 2h4M15 8l5 4-5 4M20 12H9"/>
 {%- endif %}</svg>
 {%- endmacro %}
 
@@ -51,7 +54,7 @@
       </div>
       <div class="field">
         <label for="pt-{{ item.installment.id }}">Ödenen tutar (₺)</label>
-        <input id="pt-{{ item.installment.id }}" type="text" inputmode="decimal" name="tutar" value="{{ item.installment.amount|tl_input }}" required>
+        <input id="pt-{{ item.installment.id }}" type="text" inputmode="decimal" name="tutar" value="{{ (item.try_amount or 0)|tl_input }}" required>
       </div>
     </div>
     <fieldset>
@@ -66,6 +69,14 @@
   </form>
 </details>
 {% endmacro %}
+
+{# Taksit tutarı: döviz ise TL karşılığıyla #}
+{% macro due_amount(item) -%}
+{%- set fx = item.installment.fixed -%}
+{%- if fx.currency == "TRY" -%}{{ item.installment.amount|tl }}
+{%- else -%}{{ item.installment.amount|para(fx.currency) }} <span class="muted small" style="font-weight:500">{% if item.try_amount is not none %}≈ {{ item.try_amount|tl }}{% else %}kur yok{% endif %}</span>
+{%- endif -%}
+{%- endmacro %}
 
 {% macro month_nav(base, prev_ay, next_ay, label, is_current) %}
 <div class="month-nav">

@@ -19,11 +19,14 @@ templates.env.filters.update(
     sayi=money.format_number,
     tl_input=money.format_input,
     kisa=money.format_compact,
+    para=money.format_money,
+    eur=lambda k: money.format_money(k, money.EUR),
+    kur=money.format_rate,
     tarih=timeutil.fmt_date,
     tarih_kisa=timeutil.fmt_date_short,
     gun_adi=timeutil.fmt_day_name,
 )
-templates.env.globals.update(app_name=settings.app_name, AYLAR=timeutil.AYLAR)
+templates.env.globals.update(app_name=settings.app_name, AYLAR=timeutil.AYLAR, CURRENCIES=money.CURRENCIES)
 
 
 def _asset_version() -> str:

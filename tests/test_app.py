@@ -5,7 +5,7 @@ from openpyxl import load_workbook
 from PIL import Image
 
 from app.config import settings
-from app.models import Category, FixedExpense, Installment, Receipt, Settlement, Transaction, User
+from app.models import Category, FixedExpense, Installment, PartnerPayment, Receipt, Transaction, User
 from app.timeutil import today
 
 
@@ -177,26 +177,14 @@ def test_partner_balance_and_settlement_pages(logged_in, db):
     c.post("/kayitlar/yeni", data={"tur": "gider", "gun": today().isoformat(), "tutar": "1000",
                                    "kategori_id": str(_cat(db, "Yakıt")), "kim": str(fatma.id)})
     page = c.get("/ortaklar").text
-    assert "<b>Kerem</b>, <b>Fatma</b> ortağına" in page and "500,00 ₺" in page
-    c.post("/ortaklar/hesaplasma", data={"gun": today().isoformat(), "kimden": str(kerem.id),
-                                         "kime": str(fatma.id), "tutar": "500"})
-    assert db.query(Settlement).count() == 1
+    assert "<b>Fatma</b>, şirketten" in page and "1.000,00 ₺" in page and "<b>Kerem</b>, şirketten" not in page
+    c.post("/ortaklar/odeme", data={"gun": today().isoformat(), "ortak": str(fatma.id),
+                                    "yon": "sirket_odedi", "tutar": "1000"})
+    assert db.query(PartnerPayment).count() == 1
     assert "Hesap denk" in c.get("/ortaklar").text
-    # kendine ödeme kaydedilemez
-    c.post("/ortaklar/hesaplasma", data={"gun": today().isoformat(), "kimden": str(kerem.id),
-                                         "kime": str(kerem.id), "tutar": "5"})
-    assert db.query(Settlement).count() == 1
-
-
-def test_shares_must_total_100(logged_in, db):
-    c = logged_in
-    a, b = db.query(User).order_by(User.id).all()
-    c.post("/ayarlar/pay", data={f"pay_{a.id}": "60", f"pay_{b.id}": "30"})
-    db.refresh(a)
-    assert a.share_bp == 5000
-    c.post("/ayarlar/pay", data={f"pay_{a.id}": "62,5", f"pay_{b.id}": "37,5"})
-    db.refresh(a); db.refresh(b)
-    assert (a.share_bp, b.share_bp) == (6250, 3750)
+    c.post("/ortaklar/odeme", data={"gun": today().isoformat(), "ortak": str(kerem.id),
+                                    "yon": "yanlis", "tutar": "5"})
+    assert db.query(PartnerPayment).count() == 1
 
 
 def test_report_and_exports(logged_in, db):
@@ -216,7 +204,7 @@ def test_report_and_exports(logged_in, db):
     r = c.get(f"/rapor/excel?bas={start}&bit={end}")
     assert r.status_code == 200 and "spreadsheetml" in r.headers["content-type"]
     wb = load_workbook(io.BytesIO(r.content))
-    assert wb.sheetnames == ["Özet", "Giderler", "Gelirler", "Sabit ödemeler", "Hesaplaşmalar"]
+    assert wb.sheetnames == ["Özet", "Giderler", "Gelirler", "Sabit ödemeler", "Ortak ödemeleri"]
     ozet = {row[0]: row[1] for row in wb["Özet"].iter_rows(values_only=True) if row[0]}
     assert ozet["Toplam gelir"] == 10000 and ozet["Toplam gider"] == 2000.5
     assert ozet["Net (gelir − gider)"] == 7999.5
@@ -247,6 +235,27 @@ def test_category_management(logged_in, db):
     assert "Otoyol" in c.get("/kayitlar").text                                   # eski kayıt duruyor
 
 
+def test_euro_fixed_expense_flow(logged_in, db, monkeypatch):
+    from app.money import EUR
+    from app.services import rates
+
+    c = logged_in
+    monkeypatch.setattr(rates, "fetch_tcmb", lambda currency=EUR: rates.Quote(EUR, today(), 572034))
+    r = c.post("/sabit", data={"ad": "Ekskavatör leasing", "tutar": "950", "para_birimi": "EUR",
+                               "ilk_vade": today().isoformat(), "taksit": "12", "hatirlat": "5",
+                               "kategori_id": str(_cat(db, "Leasing"))})
+    assert r.status_code == 200
+    page = c.get("/sabit").text
+    assert "950,00 €" in page and "54.343,23 ₺" in page and "57,2034" in page
+    assert 'value="54343,23"' in page
+    c.post("/sabit/kur", data={"kur": "60"})
+    page = c.get("/sabit").text
+    assert "57.000,00 ₺" in page and "elle girildi" in page
+    assert "57.000,00 ₺" in c.get("/").text
+    assert c.post("/sabit/kur", data={"kur": "abc"}).status_code == 200
+    assert "57.000,00 ₺" in c.get("/sabit").text
+
+
 def test_mistyped_year_is_rejected_everywhere(logged_in, db):
     c = logged_in
     fatma = db.query(User).filter_by(name="Fatma").one()
@@ -254,9 +263,9 @@ def test_mistyped_year_is_rejected_everywhere(logged_in, db):
     r = c.post("/kayitlar/yeni", data={"tur": "gider", "gun": "0026-10-08", "tutar": "5.000",
                                        "kategori_id": str(_cat(db, "Yakıt")), "kim": str(fatma.id)})
     assert r.status_code == 422 and db.query(Transaction).count() == 0
-    c.post("/ortaklar/hesaplasma", data={"gun": "0026-10-08", "kimden": str(kerem.id),
-                                         "kime": str(fatma.id), "tutar": "10"})
-    assert db.query(Settlement).count() == 0
+    c.post("/ortaklar/odeme", data={"gun": "0026-10-08", "ortak": str(kerem.id),
+                                    "yon": "sirket_odedi", "tutar": "10"})
+    assert db.query(PartnerPayment).count() == 0
 
 
 def test_odd_input_never_causes_server_error(logged_in, db):
@@ -270,19 +279,8 @@ def test_odd_input_never_causes_server_error(logged_in, db):
     for url in [f"/kayitlar/{big}", f"/kayitlar?kategori={big}&kim={big}", f"/fisler/{big}/dosya",
                 "/kayitlar?ay=0026-10", "/rapor?ay=abc", "/rapor/excel?bas=x&bit=y"]:
         assert c.get(url).status_code in (200, 404), url
-    a, b = db.query(User).order_by(User.id).all()
-    for val in ["inf", "1e400", "nan", "-5"]:
-        assert c.post("/ayarlar/pay", data={f"pay_{a.id}": val, f"pay_{b.id}": "50"}).status_code == 200
-    db.refresh(a)
-    assert a.share_bp == 5000
-
-
-def test_share_field_shows_what_was_saved(logged_in, db):
-    c = logged_in
-    a, b = db.query(User).order_by(User.id).all()
-    c.post("/ayarlar/pay", data={f"pay_{a.id}": "33,05", f"pay_{b.id}": "66,95"})
-    page = c.get("/ayarlar").text
-    assert 'value="33,05"' in page and 'value="66,95"' in page
+    assert c.post("/ortaklar/odeme", data={"gun": today().isoformat(), "ortak": big, "yon": "sirket_odedi", "tutar": "5"}).status_code == 200
+    assert db.query(PartnerPayment).count() == 0
 
 
 def test_turkish_category_names_do_not_duplicate(logged_in, db):

@@ -4,12 +4,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#16233b">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171b2d" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex, nofollow">
 <title>{% block title %}{{ app_name }}{% endblock %}</title>
+<script>(function(){try{var t=localStorage.getItem("tema");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}})()</script>
 <link rel="preload" href="/static/fonts/bricolage-grotesque-latin-standard-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/css/app.css?v={{ asset_v }}">
-<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/static/img/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/static/img/icon-192.png">
 </head>
 <body>
 {% block body %}
@@ -25,21 +29,29 @@
 <div class="shell">
   {% if user %}
   <aside class="side">
-    <a class="brand" href="/">{{ app_name }}</a>
+    <a class="brand" href="/"><img class="logo-light" src="/static/img/logo.png" alt="{{ app_name }}"><img class="logo-dark" src="/static/img/logo-dark.png" alt="" aria-hidden="true"></a>
     <nav aria-label="Ana menü">
       {% for href, label, ic in nav %}
       <a href="{{ href }}" {{ is_here(href) }}>{{ icon(ic) }}{{ label }}{% if href == "/sabit" and alert_count %}<span class="nav-badge" title="Uyarı bekleyen ödeme">{{ alert_count }}</span>{% endif %}</a>
       {% endfor %}
       <a href="/ayarlar" {{ is_here("/ayarlar") }}>{{ icon("ayarlar") }}Ayarlar</a>
     </nav>
+    <div class="theme-row">
+      <span>Görünüm</span>
+      <button class="theme-btn" type="button" data-theme-toggle aria-label="Açık ya da koyu tema" title="Açık / koyu tema"><span class="ic-sun">{{ icon("gunes") }}</span><span class="ic-moon">{{ icon("ay") }}</span></button>
+    </div>
     <div class="who">
-      <b>{{ user.name }}</b>
-      <form method="post" action="/cikis"><button type="submit">Çıkış yap</button></form>
+      <span class="avatar" aria-hidden="true">{{ user.name[:1] }}</span>
+      <span><b>{{ user.name }}</b>{{ user.email }}</span>
+      <form method="post" action="/cikis"><button type="submit" aria-label="Çıkış yap" title="Çıkış yap">{{ icon("cikis") }}</button></form>
     </div>
   </aside>
   <header class="topbar">
-    <a class="brand" href="/">{{ app_name }}</a>
-    <a class="icon-link" href="/ayarlar" {{ is_here("/ayarlar") }} aria-label="Ayarlar">{{ icon("ayarlar") }}</a>
+    <a class="brand" href="/"><img class="logo-light" src="/static/img/logo.png" alt="{{ app_name }}"><img class="logo-dark" src="/static/img/logo-dark.png" alt="" aria-hidden="true"></a>
+    <div class="bar-actions">
+      <button class="icon-link theme-btn" type="button" data-theme-toggle aria-label="Açık ya da koyu tema" title="Açık / koyu tema"><span class="ic-sun">{{ icon("gunes") }}</span><span class="ic-moon">{{ icon("ay") }}</span></button>
+      <a class="icon-link" href="/ayarlar" {{ is_here("/ayarlar") }} aria-label="Ayarlar">{{ icon("ayarlar") }}</a>
+    </div>
   </header>
   {% endif %}
 

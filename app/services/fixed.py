@@ -9,7 +9,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..models import GIDER, FixedExpense, Installment, Transaction
+from ..money import TRY, format_money, format_try
 from ..timeutil import AYLAR, add_months, clamp_day, month_bounds, today
+from . import rates
 
 # Taksitler bu kadar ay ilerisine kadar önceden açılır (içinde bulunulan ay dahil değil).
 # 30 güne kadar "önceden hatırlat" süresinin her ayda yetişmesi için iki ay.
@@ -57,6 +59,15 @@ def ensure_installments(db: Session, on: date | None = None) -> int:
 class DueItem:
     installment: Installment
     days_left: int  # negatifse gecikmiş
+    rate: int | None = None
+
+    @property
+    def try_amount(self) -> int | None:
+        if self.installment.fixed.currency == TRY:
+            return self.installment.amount
+        if self.rate is None:
+            return None
+        return rates.convert(self.installment.amount, self.rate)
 
     @property
     def state(self) -> str:
@@ -89,7 +100,30 @@ def unpaid_items(db: Session, on: date | None = None, until: date | None = None)
     )
     if until:
         q = q.where(Installment.due_date <= until)
-    return [DueItem(i, (i.due_date - on).days) for i in db.scalars(q)]
+    return attach_rates(db, [DueItem(i, (i.due_date - on).days) for i in db.scalars(q)])
+
+
+def attach_rates(db: Session, items: list[DueItem]) -> list[DueItem]:
+    cache: dict[str, int | None] = {}
+    for item in items:
+        cur = item.installment.fixed.currency
+        if cur == TRY:
+            continue
+        if cur not in cache:
+            row = rates.latest(db, cur)
+            cache[cur] = row.value if row else None
+        item.rate = cache[cur]
+    return items
+
+
+def amount_text(item: DueItem) -> str:
+    inst = item.installment
+    if inst.fixed.currency == TRY:
+        return format_try(inst.amount)
+    own = format_money(inst.amount, inst.fixed.currency)
+    if item.try_amount is None:
+        return f"{own} (kur yok)"
+    return f"{own} (≈ {format_try(item.try_amount)})"
 
 
 def alerts(db: Session, on: date | None = None) -> list[DueItem]:

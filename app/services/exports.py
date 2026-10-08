@@ -13,9 +13,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..models import GELIR, GIDER, FixedExpense, Installment, Settlement, Transaction
+from ..models import GELIR, GIDER, PAYMENT_LABELS, FixedExpense, Installment, PartnerPayment, Transaction
 from ..timeutil import fmt_date
-from . import balance, reports
+from ..money import TRY, format_money
+from . import balance, rates, reports
 
 TL = '#,##0.00 "₺"'
 DATE = "DD.MM.YYYY"
@@ -146,12 +147,12 @@ def build_xlsx(db: Session, start: date, end: date) -> bytes:
 
     sheet = balance.compute(db)
     row += 2
-    _header(ws, row, ["Ortak bakiyesi (bugüne kadar, tüm kayıtlar)", "Bakiye", "Durum"])
+    _header(ws, row, ["Ortakların şirketle hesabı (bugüne kadar, tüm kayıtlar)", "Bakiye", "Durum"])
     for line in sheet.lines:
         row += 1
         ws.cell(row, 1, _t(line.user.name))
         ws.cell(row, 2, line.balance / 100).number_format = TL
-        ws.cell(row, 3, "Alacaklı" if line.balance > 0 else "Borçlu" if line.balance < 0 else "Denk")
+        ws.cell(row, 3, "Şirketten alacaklı" if line.balance > 0 else "Şirkete borçlu" if line.balance < 0 else "Denk")
     _widths(ws, [48, 18, 16, 10])
 
     # --- Kayıtlar ---
@@ -160,7 +161,8 @@ def build_xlsx(db: Session, start: date, end: date) -> bytes:
 
     # --- Sabit ödemeler ---
     ws = wb.create_sheet("Sabit ödemeler")
-    _header(ws, 1, ["Sabit gider", "Taksit", "Vade", "Tutar", "Durum", "Ödeme tarihi", "Ödeyen"])
+    _header(ws, 1, ["Sabit gider", "Taksit", "Vade", "Tutar (₺)", "Döviz tutarı", "Durum", "Ödeme tarihi", "Ödeyen"])
+    rate = rates.latest(db)
     insts = db.scalars(
         select(Installment)
         .join(FixedExpense)
@@ -172,28 +174,37 @@ def build_xlsx(db: Session, start: date, end: date) -> bytes:
         ws.cell(r, 1, _t(inst.fixed.name))
         ws.cell(r, 2, f"{inst.seq}/{inst.fixed.total_count}" if inst.fixed.total_count else str(inst.seq))
         ws.cell(r, 3, inst.due_date).number_format = DATE
-        ws.cell(r, 4, (tx.amount if tx else inst.amount) / 100).number_format = TL
-        ws.cell(r, 5, "Ödendi" if tx else "Ödenmedi")
+        cur = inst.fixed.currency
         if tx:
-            ws.cell(r, 6, tx.day).number_format = DATE
-            ws.cell(r, 7, _t(tx.partner.name if tx.partner else "Ortak hesap"))
+            try_amount = tx.amount
+        elif cur == TRY:
+            try_amount = inst.amount
+        else:
+            try_amount = rates.convert(inst.amount, rate.value) if rate else None
+        if try_amount is not None:
+            ws.cell(r, 4, try_amount / 100).number_format = TL
+        if cur != TRY:
+            ws.cell(r, 5, format_money(inst.amount, cur))
+        ws.cell(r, 6, "Ödendi" if tx else "Ödenmedi")
+        if tx:
+            ws.cell(r, 7, tx.day).number_format = DATE
+            ws.cell(r, 8, _t(tx.partner.name if tx.partner else "Ortak hesap"))
     ws.freeze_panes = "A2"
-    _widths(ws, [30, 10, 13, 16, 12, 14, 18])
+    _widths(ws, [30, 10, 13, 16, 16, 12, 14, 18])
 
-    # --- Hesaplaşmalar ---
-    ws = wb.create_sheet("Hesaplaşmalar")
-    _header(ws, 1, ["Tarih", "Ödeyen ortak", "Alan ortak", "Tutar", "Not"])
-    setts = db.scalars(
-        select(Settlement).where(Settlement.day.between(start, end)).order_by(Settlement.day)
+    ws = wb.create_sheet("Ortak ödemeleri")
+    _header(ws, 1, ["Tarih", "Ortak", "İşlem", "Tutar", "Not"])
+    pays = db.scalars(
+        select(PartnerPayment).where(PartnerPayment.day.between(start, end)).order_by(PartnerPayment.day)
     ).all()
-    for r, s in enumerate(setts, 2):
-        ws.cell(r, 1, s.day).number_format = DATE
-        ws.cell(r, 2, _t(s.from_user.name))
-        ws.cell(r, 3, _t(s.to_user.name))
-        ws.cell(r, 4, s.amount / 100).number_format = TL
-        ws.cell(r, 5, _t(s.note))
+    for r, p in enumerate(pays, 2):
+        ws.cell(r, 1, p.day).number_format = DATE
+        ws.cell(r, 2, _t(p.user.name))
+        ws.cell(r, 3, PAYMENT_LABELS.get(p.direction, p.direction))
+        ws.cell(r, 4, p.amount / 100).number_format = TL
+        ws.cell(r, 5, _t(p.note))
     ws.freeze_panes = "A2"
-    _widths(ws, [13, 20, 20, 16, 40])
+    _widths(ws, [13, 20, 24, 16, 40])
 
     _defuse_formulas(wb)
     buf = io.BytesIO()

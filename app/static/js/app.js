@@ -173,4 +173,39 @@
       col.addEventListener("click", function () { show(col); });
     });
   });
+
+  var root = document.documentElement;
+  function themeChoice() {
+    try { return localStorage.getItem("tema") || "system"; } catch (e) { return "system"; }
+  }
+  function systemTheme() {
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function effectiveTheme() {
+    var c = themeChoice();
+    return c === "system" ? systemTheme() : c;
+  }
+  function markTheme(choice) {
+    document.querySelectorAll("[data-theme-set]").forEach(function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-theme-set") === choice ? "true" : "false");
+    });
+  }
+  function applyTheme(choice) {
+    if (choice === "light" || choice === "dark") root.setAttribute("data-theme", choice);
+    else root.removeAttribute("data-theme");
+    try {
+      if (choice === "system") localStorage.removeItem("tema"); else localStorage.setItem("tema", choice);
+    } catch (e) {}
+    markTheme(choice);
+  }
+  document.querySelectorAll("[data-theme-set]").forEach(function (b) {
+    b.addEventListener("click", function () { applyTheme(b.getAttribute("data-theme-set")); });
+  });
+  document.querySelectorAll("[data-theme-toggle]").forEach(function (b) {
+    b.addEventListener("click", function () { applyTheme(effectiveTheme() === "dark" ? "light" : "dark"); });
+  });
+  if (window.matchMedia) {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { markTheme(themeChoice()); });
+  }
+  markTheme(themeChoice());
 })();

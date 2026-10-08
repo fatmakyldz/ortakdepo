@@ -97,3 +97,28 @@ def format_compact(kurus: int | None) -> str:
     else:
         txt = f"{lira:.0f}"
     return sign + txt
+
+
+TRY = "TRY"
+EUR = "EUR"
+CURRENCIES = {TRY: "₺", EUR: "€"}
+RATE_SCALE = 10_000
+
+
+def format_money(kurus: int | None, currency: str = TRY) -> str:
+    return f"{format_number(kurus)} {CURRENCIES.get(currency, currency)}"
+
+
+def parse_rate(text: str | None) -> int:
+    s = "".join(str(text or "").split())[:20].replace(",", ".")
+    if not re.fullmatch(r"[0-9]+(\.[0-9]{1,4})?", s):
+        raise ValueError("Kuru 57,2034 gibi yazın.")
+    whole, _, frac = s.partition(".")
+    value = int(whole) * RATE_SCALE + int((frac + "0000")[:4])
+    if not (RATE_SCALE // 100 <= value <= 10_000 * RATE_SCALE):
+        raise ValueError("Kur gerçekçi görünmüyor, kontrol edin.")
+    return value
+
+
+def format_rate(value: int | None) -> str:
+    return f"{(value or 0) / RATE_SCALE:.4f}".replace(".", ",")

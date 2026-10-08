@@ -24,7 +24,7 @@ from ..db import SessionLocal
 from ..models import ReminderLog, User
 from ..money import format_try
 from ..timeutil import fmt_date, now, today
-from . import fixed
+from . import fixed, rates
 
 log = logging.getLogger("ortakdefter.hatirlatma")
 
@@ -90,17 +90,17 @@ def _pending(db: Session, on: date) -> list[tuple[fixed.DueItem, str]]:
 
 def build_message(items: list[fixed.DueItem]) -> tuple[str, str, str]:
     overdue = [i for i in items if i.days_left < 0]
-    total = sum(i.installment.amount for i in items)
+    total = sum(i.try_amount or 0 for i in items)
     if len(items) == 1:
         it = items[0]
-        subject = f"{it.installment.fixed.name}: {it.when_text.lower()} ({format_try(it.installment.amount)})"
+        subject = f"{it.installment.fixed.name}: {it.when_text.lower()} ({fixed.amount_text(it)})"
     elif overdue:
         subject = f"{len(items)} ödeme bekliyor, {len(overdue)} tanesi gecikti"
     else:
         subject = f"Yaklaşan {len(items)} ödeme, toplam {format_try(total)}"
 
     lines = [
-        f"- {fixed.installment_label(i.installment)}: {format_try(i.installment.amount)}, "
+        f"- {fixed.installment_label(i.installment)}: {fixed.amount_text(i)}, "
         f"vade {fmt_date(i.installment.due_date)} ({i.when_text.lower()})"
         for i in items
     ]
@@ -115,7 +115,7 @@ def build_message(items: list[fixed.DueItem]) -> tuple[str, str, str]:
         f"<br><span style='color:{'#C4432B' if i.days_left < 0 else '#4A5670'};font-size:13px'>"
         f"Vade {html.escape(fmt_date(i.installment.due_date))}, {html.escape(i.when_text.lower())}</span></td>"
         f"<td style='padding:8px 0;border-bottom:1px solid #d9dee3;text-align:right;white-space:nowrap'>"
-        f"<b>{html.escape(format_try(i.installment.amount))}</b></td>"
+        f"<b>{html.escape(fixed.amount_text(i))}</b></td>"
         "</tr>"
         for i in items
     )
@@ -139,7 +139,7 @@ def run_once(db: Session, on: date | None = None) -> int:
     pending = _pending(db, on)
     if not pending:
         return 0
-    recipients = [
+    recipients = settings.reminder_to or [
         u.email for u in db.scalars(select(User).where(User.notify_email)) if u.email
     ]
     if not recipients:
@@ -162,6 +162,10 @@ def run_once(db: Session, on: date | None = None) -> int:
 def _tick() -> None:
     with SessionLocal() as db:
         fixed.ensure_installments(db)
+        try:
+            rates.refresh(db)
+        except Exception:
+            log.exception("Kur yenilenemedi")
         if not (settings.reminders_enabled and settings.smtp_configured):
             return
         if now().hour < settings.reminder_hour:

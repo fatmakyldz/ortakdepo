@@ -9,11 +9,11 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import GIDER, Category, FixedExpense, Installment, User
-from ..money import AmountError, parse_amount
+from ..money import AmountError, CURRENCIES, EUR, TRY, format_rate, parse_amount, parse_rate
 from ..security import current_user
-from ..services import fixed as fixed_service
+from ..services import fixed as fixed_service, rates
 from ..textutil import clean_text, entry_date, to_id, to_int
-from ..timeutil import add_months, month_bounds, parse_date, today
+from ..timeutil import add_months, fmt_date, month_bounds, parse_date, today
 from ..web import flash, redirect, render
 from .transactions import attach_receipts, categories_for, clean_uploads, parse_partner, partners
 
@@ -43,14 +43,17 @@ def _page(request: Request, db: Session, form: dict | None = None, errors: list[
         cards.append({"fx": fx, "left": left, "left_total": left_total})
     leasing = db.scalar(select(Category).where(Category.kind == GIDER, Category.name == "Leasing"))
     default_form = {
-        "ad": "", "tutar": "", "ilk_vade": "", "taksit": "", "hatirlat": "3",
+        "ad": "", "tutar": "", "para_birimi": TRY, "ilk_vade": "", "taksit": "", "hatirlat": "3",
         "kategori_id": str(leasing.id) if leasing else "", "not": "",
     }
     return render(request, "fixed.html", {
         "cards": cards,
         "ended": ended,
         "unpaid": unpaid,
-        "unpaid_total": sum(i.installment.amount for i in unpaid),
+        "unpaid_total": sum(i.try_amount or 0 for i in unpaid),
+        "unpaid_estimate": any(i.installment.fixed.currency != TRY for i in unpaid),
+        "rate": rates.latest(db),
+        "needs_rate": any(fx.currency != TRY for fx in active),
         "paid": paid,
         "partners": partners(db),
         "categories": categories_for(db, GIDER),
@@ -70,6 +73,7 @@ def create_fixed(
     request: Request,
     ad: str = Form(""),
     tutar: str = Form(""),
+    para_birimi: str = Form(TRY),
     ilk_vade: str = Form(""),
     taksit: str = Form(""),
     hatirlat: str = Form("3"),
@@ -78,9 +82,12 @@ def create_fixed(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
-    form = {"ad": ad, "tutar": tutar, "ilk_vade": ilk_vade, "taksit": taksit,
+    form = {"ad": ad, "tutar": tutar, "para_birimi": para_birimi, "ilk_vade": ilk_vade, "taksit": taksit,
             "hatirlat": hatirlat, "kategori_id": kategori_id, "not": aciklama}
     errors: list[str] = []
+    currency = para_birimi if para_birimi in CURRENCIES else None
+    if currency is None:
+        errors.append("Para birimini seçin.")
     name = clean_text(ad, 120)
     if not name:
         errors.append("Giderin adını yazın. Örnek: Kamyon leasing")
@@ -110,7 +117,7 @@ def create_fixed(
         return _page(request, db, form, errors, status=422)
 
     fx = FixedExpense(
-        name=name, amount=amount, due_day=first_due.day, first_due=first_due,
+        name=name, amount=amount, currency=currency, due_day=first_due.day, first_due=first_due,
         total_count=total_count, category_id=category.id, remind_days=remind,
         note=clean_text(aciklama, 300),
     )
@@ -118,6 +125,37 @@ def create_fixed(
     db.commit()
     fixed_service.ensure_installments(db)
     flash(request, f"“{name}” eklendi. Ödeme günü yaklaşınca uyarı göreceksiniz.")
+    if currency != TRY and rates.latest(db, currency) is None:
+        try:
+            rates.refresh(db, currency, force=True)
+        except rates.RateError as exc:
+            flash(request, f"{exc} Kuru elle girebilirsiniz.", "hata")
+    return redirect("/sabit")
+
+
+@router.post("/sabit/kur")
+def set_rate(
+    request: Request, kur: str = Form(""),
+    db: Session = Depends(get_db), user: User = Depends(current_user),
+):
+    try:
+        value = parse_rate(kur)
+    except ValueError as exc:
+        flash(request, str(exc), "hata")
+        return redirect("/sabit")
+    rates.save(db, rates.Quote(EUR, today(), value), rates.ELLE)
+    flash(request, "Euro kuru kaydedildi; taksitlerin TL karşılığı bu kurla hesaplanıyor.")
+    return redirect("/sabit")
+
+
+@router.post("/sabit/kur/yenile")
+def refresh_rate(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    try:
+        row = rates.refresh(db, force=True)
+    except rates.RateError as exc:
+        flash(request, str(exc), "hata")
+        return redirect("/sabit")
+    flash(request, f"TCMB kuru alındı: 1 € = {format_rate(row.value)} ₺ ({fmt_date(row.day)} bülteni).")
     return redirect("/sabit")
 
 

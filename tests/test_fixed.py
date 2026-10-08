@@ -1,7 +1,8 @@
 from datetime import date
 
 from app.models import GIDER, Category, FixedExpense, ReminderLog, Transaction, User
-from app.services import fixed, reminders
+from app.money import EUR
+from app.services import fixed, rates, reminders, reports
 
 
 def _fixed(db, first_due, count=None, remind=3, amount=18_500_00):
@@ -90,6 +91,23 @@ def test_pay_creates_expense_and_delete_reopens(db):
     assert not inst.is_paid
 
 
+def test_euro_installments_convert_with_latest_rate(db):
+    cat = db.query(Category).filter_by(kind=GIDER, name="Leasing").one()
+    db.add(FixedExpense(name="Ekskavatör leasing", amount=950_00, currency=EUR, due_day=15,
+                        first_due=date(2026, 10, 15), total_count=12, category_id=cat.id))
+    db.commit()
+    fixed.ensure_installments(db, date(2026, 10, 8))
+    item = fixed.unpaid_items(db, date(2026, 10, 8))[0]
+    assert item.try_amount is None and fixed.amount_text(item) == "950,00 € (kur yok)"
+
+    rates.save(db, rates.Quote(EUR, date(2026, 10, 8), 572034), rates.TCMB)
+    item = fixed.unpaid_items(db, date(2026, 10, 8))[0]
+    assert item.try_amount == 54343_23
+    assert fixed.amount_text(item) == "950,00 € (≈ 54.343,23 ₺)"
+    rep = reports.month_report(db, 2026, 10)
+    assert (rep.unpaid_fixed, rep.unpaid_fixed_count) == (54343_23, 1)
+
+
 def test_reminders_send_once_per_stage(db, monkeypatch):
     db.add(User(name="A", email="a@x.co", password_hash="x"))
     db.add(User(name="B", email="b@x.co", password_hash="x", notify_email=False))
@@ -109,6 +127,17 @@ def test_reminders_send_once_per_stage(db, monkeypatch):
     assert sent[0][0] == ["a@x.co"]                                 # bildirimi kapalı ortağa gitmez
     assert "Kamyon leasing" in sent[0][1] and "18.500,00 ₺" in sent[0][2]
     assert db.query(ReminderLog).count() == 4
+
+
+def test_reminder_to_overrides_partner_addresses(db, monkeypatch):
+    db.add(User(name="A", email="a@x.co", password_hash="x"))
+    db.commit()
+    _fixed(db, date(2026, 10, 15), remind=3)
+    sent = []
+    monkeypatch.setattr(reminders, "send_mail", lambda to, subject, text, html=None: sent.append(to))
+    monkeypatch.setattr(reminders.settings, "reminder_to", ["info@sezkar.com"])
+    assert reminders.run_once(db, date(2026, 10, 12)) == 1
+    assert sent == [["info@sezkar.com"]]
 
 
 def test_overdue_installments_share_one_weekly_mail(db, monkeypatch):

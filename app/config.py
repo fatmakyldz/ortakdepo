@@ -43,6 +43,8 @@ class Settings:
     smtp_tls: str  # "starttls" | "ssl" | "none"
     reminder_hour: int
     reminders_enabled: bool
+    reminder_to: list[str]
+    rates_enabled: bool
     max_upload_mb: int
 
     @property
@@ -90,7 +92,7 @@ def load_settings() -> Settings:
             "Docker kurulumunda: sudo chown -R 10001:10001 ./veri"
         ) from None
     return Settings(
-        app_name=os.environ.get("APP_NAME", "Ortak Defter"),
+        app_name=os.environ.get("APP_NAME", "Sezkar Muhasebe"),
         data_dir=data_dir,
         secret_key=_secret_key(data_dir),
         base_url=os.environ.get("BASE_URL", "http://localhost:8000").rstrip("/"),
@@ -104,6 +106,8 @@ def load_settings() -> Settings:
         smtp_tls=os.environ.get("SMTP_TLS", "starttls").strip().lower(),
         reminder_hour=_int("REMINDER_HOUR", 9),
         reminders_enabled=_bool("REMINDERS_ENABLED", True),
+        reminder_to=[a.strip() for a in os.environ.get("REMINDER_TO", "").split(",") if a.strip()],
+        rates_enabled=_bool("RATES_ENABLED", True),
         max_upload_mb=_int("MAX_UPLOAD_MB", 15),
     )
 

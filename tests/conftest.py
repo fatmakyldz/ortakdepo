@@ -9,6 +9,8 @@ os.environ["DATA_DIR"] = _tmp
 os.environ["SECRET_KEY"] = "test-anahtari"
 os.environ["SMTP_HOST"] = ""
 os.environ["REMINDERS_ENABLED"] = "0"
+os.environ["REMINDER_TO"] = ""
+os.environ["RATES_ENABLED"] = "0"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest  # noqa: E402
@@ -17,6 +19,16 @@ from fastapi.testclient import TestClient  # noqa: E402
 from app.db import Base, SessionLocal, engine, init_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.security import login_throttle  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _no_network(monkeypatch):
+    from app.services import rates
+
+    def offline(currency="EUR"):
+        raise rates.RateError("test ortamında ağ yok")
+
+    monkeypatch.setattr(rates, "fetch_tcmb", offline)
 
 
 @pytest.fixture()

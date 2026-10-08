@@ -18,7 +18,8 @@ from PIL import Image, ImageDraw  # noqa: E402
 
 from app.config import settings  # noqa: E402
 from app.db import SessionLocal, init_db  # noqa: E402
-from app.models import GELIR, GIDER, Category, FixedExpense, Receipt, Settlement, Transaction, User  # noqa: E402
+from app.models import GELIR, GIDER, SIRKET_ODEDI, Category, ExchangeRate, FixedExpense, PartnerPayment, Receipt, Transaction, User  # noqa: E402
+from app.money import EUR  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from app.services import fixed  # noqa: E402
 from app.timeutil import add_months, clamp_day, today  # noqa: E402
@@ -100,14 +101,15 @@ def main() -> None:
             db.add(Transaction(kind=GIDER, day=d, amount=42_750_00, category_id=cat["Leasing"],
                                partner_id=None, description="Ekskavatör leasing (geçmiş taksit)",
                                created_by_id=fatma.id))
-        db.add(FixedExpense(name="Ekskavatör leasing", amount=42_750_00, due_day=due.day, first_due=due,
+        db.add(FixedExpense(name="Ekskavatör leasing", amount=950_00, currency=EUR, due_day=due.day, first_due=due,
                             total_count=26, category_id=cat["Leasing"], remind_days=5,
-                            note="Sözleşme 2025/1184"))
+                            note="Sözleşme 2025/1184, aylık 950 €"))
+        db.add(ExchangeRate(currency=EUR, day=t, value=572034, source="tcmb"))
         late = t - timedelta(days=3)
         db.add(FixedExpense(name="Depo kirası", amount=15_000_00, due_day=late.day, first_due=late,
                             total_count=None, category_id=cat["Ek gider"], remind_days=3))
-        db.add(Settlement(day=t - timedelta(days=40), from_user_id=kerem.id, to_user_id=fatma.id,
-                          amount=60_000_00, note="Havale"))
+        db.add(PartnerPayment(day=t - timedelta(days=40), user_id=fatma.id, direction=SIRKET_ODEDI,
+                              amount=60_000_00, note="Havale"))
         db.commit()
         fixed.ensure_installments(db)
     print("Örnek veri yazıldı:", settings.data_dir)
