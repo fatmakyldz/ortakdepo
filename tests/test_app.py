@@ -235,6 +235,17 @@ def test_category_management(logged_in, db):
     assert "Otoyol" in c.get("/kayitlar").text                                   # eski kayıt duruyor
 
 
+def test_setup_requires_key_when_configured(client, db, monkeypatch):
+    monkeypatch.setattr(settings, "setup_key", "cok-gizli-anahtar")
+    assert 'name="anahtar"' in client.get("/kurulum").text
+    data = {"ad1": "F", "eposta1": "f@x.co", "sifre1": "gizli-sifre-1",
+            "ad2": "K", "eposta2": "k@x.co", "sifre2": "gizli-sifre-2"}
+    assert client.post("/kurulum", data={**data, "anahtar": "yanlis"}).status_code == 422
+    assert db.query(User).count() == 0
+    r = client.post("/kurulum", data={**data, "anahtar": "cok-gizli-anahtar"}, follow_redirects=False)
+    assert r.status_code == 303 and db.query(User).count() == 2
+
+
 def test_euro_fixed_expense_flow(logged_in, db, monkeypatch):
     from app.money import EUR
     from app.services import rates

@@ -1,0 +1,37 @@
+# Render üzerinde kurulum (Blueprint). Kullanımı README.md > "Buluta kurmak" bölümünde.
+services:
+  - type: web
+    name: sezkar-muhasebe
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter             # 512 MB; kalıcı disk ücretsiz planda yok
+    region: frankfurt         # Türkiye'ye en yakın bölge; sonradan değiştirilemez
+    healthCheckPath: /saglik
+    autoDeployTrigger: commit # main dalına her gönderimde kendiliğinden güncellenir
+    disk:
+      name: veri              # veritabanı ve fişler; Render her gün yedeğini alır
+      mountPath: /var/data
+      sizeGB: 2
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+      - key: HTTPS_ONLY
+        value: "1"
+      - key: TZ_NAME
+        value: Europe/Istanbul
+      - key: APP_NAME
+        value: Sezkar Muhasebe
+      - key: REMINDER_TO
+        value: info@sezkar.com
+      - key: KURULUM_ANAHTARI # ilk kurulum sayfasında sorulur; değeri Environment sekmesinde
+        generateValue: true
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false

@@ -45,6 +45,7 @@ class Settings:
     reminders_enabled: bool
     reminder_to: list[str]
     rates_enabled: bool
+    setup_key: str
     max_upload_mb: int
 
     @property
@@ -95,7 +96,7 @@ def load_settings() -> Settings:
         app_name=os.environ.get("APP_NAME", "Sezkar Muhasebe"),
         data_dir=data_dir,
         secret_key=_secret_key(data_dir),
-        base_url=os.environ.get("BASE_URL", "http://localhost:8000").rstrip("/"),
+        base_url=(os.environ.get("BASE_URL") or os.environ.get("RENDER_EXTERNAL_URL") or "http://localhost:8000").rstrip("/"),
         https_only=_bool("HTTPS_ONLY", False),
         timezone=ZoneInfo(os.environ.get("TZ_NAME", "Europe/Istanbul")),
         smtp_host=os.environ.get("SMTP_HOST", "").strip(),
@@ -108,6 +109,7 @@ def load_settings() -> Settings:
         reminders_enabled=_bool("REMINDERS_ENABLED", True),
         reminder_to=[a.strip() for a in os.environ.get("REMINDER_TO", "").split(",") if a.strip()],
         rates_enabled=_bool("RATES_ENABLED", True),
+        setup_key=os.environ.get("KURULUM_ANAHTARI", "").strip(),
         max_upload_mb=_int("MAX_UPLOAD_MB", 15),
     )
 

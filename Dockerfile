@@ -11,10 +11,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY scripts ./scripts
 
-RUN useradd --system --uid 10001 defter && mkdir /data && chown defter /data
-USER defter
-VOLUME /data
+RUN useradd --system --uid 10001 --no-create-home defter && mkdir /data && chown defter /data
 EXPOSE 8000
 
+# Betik root olarak başlar, veri klasörünü "defter" kullanıcısına verir ve yetkiyi bırakır.
 # Tek süreç: hatırlatma döngüsü ve giriş sınırlayıcı süreç içinde çalışır.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+CMD ["python", "scripts/baslat.py"]

@@ -11,6 +11,7 @@ os.environ["SMTP_HOST"] = ""
 os.environ["REMINDERS_ENABLED"] = "0"
 os.environ["REMINDER_TO"] = ""
 os.environ["RATES_ENABLED"] = "0"
+os.environ["KURULUM_ANAHTARI"] = ""
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest  # noqa: E402

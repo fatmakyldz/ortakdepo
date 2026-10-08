@@ -29,46 +29,50 @@ DATA_DIR=./deneme-veri uvicorn app.main:app
 # giriş: fatma@example.com / deneme-1234
 ```
 
-## Sunucuya kurmak (Docker + otomatik HTTPS)
+## Buluta kurmak (ortakların telefondan girmesi için)
 
-Gerekenler: Docker kurulu bir sunucu ve sunucunun IP adresine yönlendirilmiş bir alan adı.
+Uygulamanın iki ihtiyacı var: **kalıcı disk** (veritabanı ve fişler) ve **sürekli açık tek süreç** (hatırlatma e-postaları içeriden gider). Kullanılmayınca uyuyan ya da diski olmayan ücretsiz planlar bu yüzden uymaz.
+
+### Render ile (en kolay, ~7,5 $/ay)
+
+1. [render.com](https://render.com) üzerinde hesap açın, GitHub hesabınızı bağlayın.
+2. **New > Blueprint** deyip bu depoyu seçin. Render `render.yaml` dosyasını okur: Frankfurt'ta bir web servisi ve 2 GB disk kurar. Değişkenler (uygulama adı, hatırlatma adresi) dosyada hazır.
+3. Kurulum bitince servis sayfasındaki `https://....onrender.com` adresini açın. Kurulum sayfası bir **kurulum anahtarı** sorar: servisin **Environment** sekmesindeki `KURULUM_ANAHTARI` değerini kopyalayıp yapıştırın.
+4. İki ortağın adını, e-postasını ve şifresini girin. Defter hazır.
+5. E-posta hatırlatmaları için **Environment** sekmesinde `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` değerlerini doldurun.
+6. İsterseniz **Settings > Custom Domains** ile `muhasebe.sezkar.com` gibi bir alan adı bağlayın; sertifikayı Render alır.
+
+`main` dalına gönderilen her değişiklik kendiliğinden yayına girer. Telefonda adresi açıp tarayıcı menüsünden **Ana ekrana ekle** deyince uygulama simgesiyle açılır.
+
+### Fly.io ile (en ucuz, ~2 $/ay)
+
+Bilgisayarda [flyctl](https://fly.io/docs/flyctl/install/) gerekir. `fly launch --copy-config --no-deploy`, ardından `fly secrets set KURULUM_ANAHTARI=... REMINDER_TO=info@sezkar.com APP_NAME="Sezkar Muhasebe"` ve `fly deploy --ha=false`. Ayrıntılar `fly.toml` içinde.
+
+### Kendi sunucunuzda (Docker + otomatik HTTPS)
 
 ```bash
-cp .env.example .env                               # DOMAIN, BASE_URL ve (isterseniz) SMTP bilgilerini doldurun
-mkdir -p veri && sudo chown -R 10001:10001 veri    # uygulama kapsayıcıda bu kullanıcıyla çalışır
+cp .env.example .env               # DOMAIN, BASE_URL, KURULUM_ANAHTARI ve SMTP bilgilerini doldurun
 docker compose up -d --build
 ```
 
-`chown` adımı atlanırsa uygulama veri klasörüne yazamaz ve "Veri klasörüne yazılamıyor" diyerek açılmaz.
+Caddy alan adı için sertifikayı kendisi alır. Veritabanı ve fişler `./veri` klasöründe durur; kapsayıcı açılışta klasörü kendi kullanıcısına verir, elle `chown` gerekmez. Güncelleme için yeni dosyaları çekip `docker compose up -d --build` demek yeterli.
 
-Caddy alan adı için sertifikayı kendisi alır. Site açılınca **hemen kurulum sayfasını doldurun**: ilk gelen kişi ortak hesaplarını oluşturur, sonrasında kurulum sayfası kapanır.
-
-Veritabanı ve fişler `./veri` klasöründe durur. Güncelleme için yeni dosyaları kopyalayıp `docker compose up -d --build` demek yeterli; veri klasörüne dokunulmaz.
-
-> Bu kurulum dosyaları (Dockerfile, docker-compose, Caddyfile) yazıldı ama Docker ile çalıştırılarak denenmedi; uygulamanın kendisi doğrudan `uvicorn` ile denendi. İlk kurulumda `docker compose logs -f` ile bakın.
+> Docker, Render ve Fly dosyaları belgelerine göre yazıldı ama bu ortamda çalıştırılarak denenmedi. İlk kurulumda günlüklere bakın.
 
 ### Docker'sız
-
-Uygulamayı bir kullanıcı altında çalıştırıp önüne Nginx ya da Caddy koyun:
 
 ```bash
 DATA_DIR=/var/lib/ortak-defter uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers
 ```
 
-Dikkat edilecekler:
-
-- **Tek süreç** çalıştırın (`--workers` vermeyin). Hatırlatma döngüsü ve giriş deneme sınırı süreç içinde tutulur.
-- Ters vekil `Host` başlığını olduğu gibi iletmeli (Nginx: `proxy_set_header Host $host;`). Başka siteden gelen form gönderimleri buna bakılarak reddedilir.
-- Vekil gerçek ziyaretçi adresini de iletmeli (Nginx: `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` ve `proxy_set_header X-Forwarded-Proto $scheme;`). Yoksa hatalı giriş sınırı herkesi tek adres sayar ve birkaç yanlış şifre iki ortağı da 15 dakika kilitler.
-- Vekilde yükleme sınırını açın (Nginx: `client_max_body_size 150m;`).
-- HTTPS'te `HTTPS_ONLY=1` yapın.
+Tek süreç kullanın (`--workers` vermeyin). Ters vekil `Host`, `X-Forwarded-For` ve `X-Forwarded-Proto` başlıklarını iletsin, yükleme sınırını açın (Nginx: `client_max_body_size 150m;`), HTTPS'te `HTTPS_ONLY=1` yapın.
 
 ## Ayarlar (`.env`)
 
 | Değişken | Ne işe yarar | Varsayılan |
 |---|---|---|
 | `APP_NAME` | Sekme başlığında ve e-postalarda görünen ad | Sezkar Muhasebe |
-| `BASE_URL` | E-postalardaki bağlantının adresi | http://localhost:8000 |
+| `BASE_URL` | E-postalardaki bağlantının adresi | Render'da kendiliğinden; yoksa http://localhost:8000 |
 | `HTTPS_ONLY` | Oturum çerezi yalnızca HTTPS'te gitsin | 0 |
 | `DATA_DIR` | Veritabanı ve fişlerin klasörü | ./data |
 | `TZ_NAME` | Saat dilimi | Europe/Istanbul |
@@ -79,6 +83,7 @@ Dikkat edilecekler:
 | `RATES_ENABLED` | TCMB'den günlük euro kuru çekilsin mi | 1 |
 | `MAX_UPLOAD_MB` | Dosya başına yükleme sınırı | 15 |
 | `SECRET_KEY` | Oturum imza anahtarı | ilk açılışta üretilir, veri klasöründe saklanır |
+| `KURULUM_ANAHTARI` | Doluysa ilk kurulum sayfası bu anahtarı sorar | boş |
 
 ### E-posta hatırlatmaları
 

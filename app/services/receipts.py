@@ -67,6 +67,12 @@ def save_upload(upload: UploadFile) -> SavedFile:
 
     try:
         img = Image.open(io.BytesIO(raw))
+        if img.format == "JPEG":
+            # JPEG doğrudan küçültülmüş olarak açılır: 12 MP'lik fotoğraf belleğe tam boy
+            # (36 MB) yerine yarı ya da çeyrek boy gelir. Küçük sunucuda bellek için önemli.
+            scale = max(img.size) / MAX_SIDE
+            if scale > 1:
+                img.draft("RGB", (int(img.width / scale), int(img.height / scale)))
         img.load()
     except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
         raise ReceiptError(
@@ -80,6 +86,7 @@ def save_upload(upload: UploadFile) -> SavedFile:
         bg = Image.new("RGB", rgba.size, (255, 255, 255))
         bg.paste(rgba, mask=rgba.split()[-1])
         img = bg
+    del raw  # yüklenen ham dosya artık gerekmiyor; belleği erken bırak
     img.thumbnail((MAX_SIDE, MAX_SIDE), Image.LANCZOS)
     out = folder / f"{key}.jpg"
     img.save(out, "JPEG", quality=82, optimize=True)
