@@ -5,7 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -68,6 +68,15 @@ async def _http_error(request: Request, exc: StarletteHTTPException):
     if isinstance(exc.detail, str) and exc.status_code == 404 and exc.detail != "Not Found":
         text = exc.detail
     return render(request, "error.html", {"title": title, "text": text}, status_code=exc.status_code)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    # Tarayıcıların kendiliğinden istediği adres; sezkar.com'daki dosyanın aynısı
+    return FileResponse(
+        APP_DIR / "static" / "img" / "favicon.ico", media_type="image/x-icon",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @app.get("/saglik", include_in_schema=False)

@@ -346,3 +346,15 @@ def test_deleting_payment_of_ended_fixed_expense_leaves_no_hidden_debt(logged_in
     tx = db.query(Transaction).one()
     c.post(f"/kayitlar/{tx.id}/sil")
     assert db.query(Installment).count() == 0 and db.query(Transaction).count() == 0
+
+
+def test_favicon_matches_site_icons(client, db):
+    """Sekme simgeleri (sezkar.com ile aynı dosyalar) girişsiz de sunulur ve sayfada bağlıdır."""
+    assert client.get("/favicon.ico").headers["content-type"] == "image/x-icon"
+    for path in ["/static/img/icon-acik-tema.png", "/static/img/icon-koyu-tema.png", "/static/img/apple-icon.png"]:
+        r = client.get(path)
+        assert r.status_code == 200 and r.headers["content-type"] == "image/png", path
+    page = client.get("/kurulum").text
+    assert 'href="/static/img/icon-acik-tema.png"' in page and "(prefers-color-scheme: light)" in page
+    assert 'href="/static/img/icon-koyu-tema.png"' in page and "(prefers-color-scheme: dark)" in page
+    assert 'rel="apple-touch-icon" href="/static/img/apple-icon.png"' in page
